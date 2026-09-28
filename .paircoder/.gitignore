@@ -1,0 +1,11 @@
+# Runtime artifacts — do not commit
+.cli_version
+cache/**
+engage/runs/*.log
+engage/runs/base_attestations.json
+feedback/**
+history/benchmarks/matrix/**
+hooks/**
+reviews/**
+telemetry/**
+data/

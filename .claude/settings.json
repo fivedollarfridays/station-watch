@@ -1,0 +1,233 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/credentials.json)",
+      "Read(**/secrets.yaml)",
+      "Read(**/.pypirc)",
+      "Read(**/.npmrc)",
+      "Edit(**/.env)",
+      "Edit(**/.env.*)",
+      "Edit(**/credentials.json)",
+      "Edit(**/secrets.yaml)",
+      "Edit(**/.pypirc)",
+      "Edit(**/.npmrc)",
+      "Edit(.paircoder/tasks/*.task.md)",
+      "Edit(.paircoder/tasks/**/*.task.md)",
+      "Bash(git stash*)",
+      "Bash(git -C * stash*)",
+      "Bash(sh -c *stash*)",
+      "Bash(*/git stash*)",
+      "Bash(env git stash*)",
+      "Bash(git --no-pager stash*)",
+      "Bash(GIT_DIR=* git stash*)"
+    ]
+  },
+  "env": {
+    "OTEL_LOG_ASSISTANT_RESPONSES": "0"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'if [ -n \"${CLAUDE_PROJECT_DIR:-}\" ] && [ -f \"$CLAUDE_PROJECT_DIR/scripts/bootstrap-remote.sh\" ]; then exec bash \"$CLAUDE_PROJECT_DIR/scripts/bootstrap-remote.sh\"; fi; if [ -f \"scripts/bootstrap-remote.sh\" ]; then exec bash \"scripts/bootstrap-remote.sh\"; fi; if [ -n \"${CLAUDE_CODE_REMOTE:-}\" ]; then echo \"bootstrap: script not found in $CLAUDE_PROJECT_DIR or .\" >&2; fi'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bpsai-pair enforce containment --file \"$CLAUDE_TOOL_INPUT_file_path\" --operation read"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bpsai-pair enforce containment --file \"$CLAUDE_TOOL_INPUT_file_path\" --operation write"
+          },
+          {
+            "type": "command",
+            "command": "bpsai-pair enforce task-edit --file \"$CLAUDE_TOOL_INPUT_file_path\" --new-content \"$CLAUDE_TOOL_INPUT_new_string$CLAUDE_TOOL_INPUT_content\""
+          },
+          {
+            "type": "command",
+            "command": "bpsai-pair enforce state-edit --file \"$CLAUDE_TOOL_INPUT_file_path\" --new-content \"$CLAUDE_TOOL_INPUT_new_string$CLAUDE_TOOL_INPUT_content\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'H=\"${CLAUDE_PROJECT_DIR:-}\"; if [ -z \"$H\" ] || [ ! -f \"$H/.claude/hooks/base_branch_guard.py\" ]; then G=$(git rev-parse --show-toplevel 2>/dev/null); if [ -n \"$G\" ] && [ -f \"$G/.claude/hooks/base_branch_guard.py\" ]; then H=\"$G\"; else H=\".\"; fi; fi; if [ -f \"$H/.claude/hooks/base_branch_guard.py\" ]; then if [ ! -d \"$H/.paircoder\" ]; then U=\"$H\"; G=$(git rev-parse --show-toplevel 2>/dev/null); if [ -n \"$G\" ] && [ \"$G\" != \"$U\" ] && [ -f \"$G/.claude/hooks/base_branch_guard.py\" ] && [ -d \"$G/.paircoder\" ]; then H=\"$G\"; echo \"base_branch_guard.py: CLAUDE_PROJECT_DIR=$U has no payload, resolving .claude/hooks from cwd checkout\" >&2; exec python3 \"$H/.claude/hooks/base_branch_guard.py\"; fi; echo \"base_branch_guard.py: refusing to exec -- no trusted .paircoder/ payload checkout found (CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>} cwd=$(pwd))\" >&2; exit 2; else if [ -z \"${CLAUDE_PROJECT_DIR:-}\" ]; then echo \"base_branch_guard.py: CLAUDE_PROJECT_DIR unset, resolving .claude/hooks from cwd\" >&2; elif [ \"$H\" != \"${CLAUDE_PROJECT_DIR}\" ]; then echo \"base_branch_guard.py: CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR} has no payload, resolving .claude/hooks from cwd checkout\" >&2; fi; exec python3 \"$H/.claude/hooks/base_branch_guard.py\"; fi; else echo \"guard base_branch_guard.py not found -- CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>} cwd=$(pwd)\" >&2; fi'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'H=\"${CLAUDE_PROJECT_DIR:-}\"; if [ -z \"$H\" ] || [ ! -f \"$H/.claude/hooks/base_branch_guard.py\" ]; then G=$(git rev-parse --show-toplevel 2>/dev/null); if [ -n \"$G\" ] && [ -f \"$G/.claude/hooks/base_branch_guard.py\" ]; then H=\"$G\"; else H=\".\"; fi; fi; if [ -f \"$H/.claude/hooks/base_branch_guard.py\" ]; then if [ ! -d \"$H/.paircoder\" ]; then U=\"$H\"; G=$(git rev-parse --show-toplevel 2>/dev/null); if [ -n \"$G\" ] && [ \"$G\" != \"$U\" ] && [ -f \"$G/.claude/hooks/base_branch_guard.py\" ] && [ -d \"$G/.paircoder\" ]; then H=\"$G\"; echo \"base_branch_guard.py: CLAUDE_PROJECT_DIR=$U has no payload, resolving .claude/hooks from cwd checkout\" >&2; exec python3 \"$H/.claude/hooks/base_branch_guard.py\"; fi; echo \"base_branch_guard.py: refusing to exec -- no trusted .paircoder/ payload checkout found (CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>} cwd=$(pwd))\" >&2; exit 2; else if [ -z \"${CLAUDE_PROJECT_DIR:-}\" ]; then echo \"base_branch_guard.py: CLAUDE_PROJECT_DIR unset, resolving .claude/hooks from cwd\" >&2; elif [ \"$H\" != \"${CLAUDE_PROJECT_DIR}\" ]; then echo \"base_branch_guard.py: CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR} has no payload, resolving .claude/hooks from cwd checkout\" >&2; fi; exec python3 \"$H/.claude/hooks/base_branch_guard.py\"; fi; else echo \"guard base_branch_guard.py not found -- CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>} cwd=$(pwd)\" >&2; fi'"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'H=\"${CLAUDE_PROJECT_DIR:-}\"; if [ -z \"$H\" ] || [ ! -f \"$H/.claude/hooks/dispatch_contract_gate.py\" ]; then G=$(git rev-parse --show-toplevel 2>/dev/null); if [ -n \"$G\" ] && [ -f \"$G/.claude/hooks/dispatch_contract_gate.py\" ]; then H=\"$G\"; else H=\".\"; fi; fi; if [ -f \"$H/.claude/hooks/dispatch_contract_gate.py\" ]; then if [ ! -d \"$H/.paircoder\" ]; then U=\"$H\"; G=$(git rev-parse --show-toplevel 2>/dev/null); if [ -n \"$G\" ] && [ \"$G\" != \"$U\" ] && [ -f \"$G/.claude/hooks/dispatch_contract_gate.py\" ] && [ -d \"$G/.paircoder\" ]; then H=\"$G\"; echo \"dispatch_contract_gate.py: CLAUDE_PROJECT_DIR=$U has no payload, resolving .claude/hooks from cwd checkout\" >&2; exec python3 \"$H/.claude/hooks/dispatch_contract_gate.py\"; fi; echo \"dispatch_contract_gate.py: refusing to exec -- no trusted .paircoder/ payload checkout found (CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>} cwd=$(pwd))\" >&2; exit 2; else if [ -z \"${CLAUDE_PROJECT_DIR:-}\" ]; then echo \"dispatch_contract_gate.py: CLAUDE_PROJECT_DIR unset, resolving .claude/hooks from cwd\" >&2; elif [ \"$H\" != \"${CLAUDE_PROJECT_DIR}\" ]; then echo \"dispatch_contract_gate.py: CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR} has no payload, resolving .claude/hooks from cwd checkout\" >&2; fi; exec python3 \"$H/.claude/hooks/dispatch_contract_gate.py\"; fi; else echo \"guard dispatch_contract_gate.py not found -- CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>} cwd=$(pwd)\" >&2; fi'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'H=\"${CLAUDE_PROJECT_DIR:-}\"; if [ -z \"$H\" ] || [ ! -f \"$H/.claude/hooks/pr_merge_guard.py\" ]; then G=$(git rev-parse --show-toplevel 2>/dev/null); if [ -n \"$G\" ] && [ -f \"$G/.claude/hooks/pr_merge_guard.py\" ]; then H=\"$G\"; else H=\".\"; fi; fi; if [ -f \"$H/.claude/hooks/pr_merge_guard.py\" ]; then if [ ! -d \"$H/.paircoder\" ]; then U=\"$H\"; G=$(git rev-parse --show-toplevel 2>/dev/null); if [ -n \"$G\" ] && [ \"$G\" != \"$U\" ] && [ -f \"$G/.claude/hooks/pr_merge_guard.py\" ] && [ -d \"$G/.paircoder\" ]; then H=\"$G\"; echo \"pr_merge_guard.py: CLAUDE_PROJECT_DIR=$U has no payload, resolving .claude/hooks from cwd checkout\" >&2; exec python3 \"$H/.claude/hooks/pr_merge_guard.py\"; fi; echo \"pr_merge_guard.py: refusing to exec -- no trusted .paircoder/ payload checkout found (CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>} cwd=$(pwd))\" >&2; exit 2; else if [ -z \"${CLAUDE_PROJECT_DIR:-}\" ]; then echo \"pr_merge_guard.py: CLAUDE_PROJECT_DIR unset, resolving .claude/hooks from cwd\" >&2; elif [ \"$H\" != \"${CLAUDE_PROJECT_DIR}\" ]; then echo \"pr_merge_guard.py: CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR} has no payload, resolving .claude/hooks from cwd checkout\" >&2; fi; exec python3 \"$H/.claude/hooks/pr_merge_guard.py\"; fi; else echo \"guard pr_merge_guard.py not found -- CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>} cwd=$(pwd)\" >&2; fi'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'H=\"${CLAUDE_PROJECT_DIR:-}\"; if [ -z \"$H\" ] || [ ! -f \"$H/.claude/hooks/issue_filing_gate.py\" ]; then G=$(git rev-parse --show-toplevel 2>/dev/null); if [ -n \"$G\" ] && [ -f \"$G/.claude/hooks/issue_filing_gate.py\" ]; then H=\"$G\"; else H=\".\"; fi; fi; if [ -f \"$H/.claude/hooks/issue_filing_gate.py\" ]; then if [ ! -d \"$H/.paircoder\" ]; then U=\"$H\"; G=$(git rev-parse --show-toplevel 2>/dev/null); if [ -n \"$G\" ] && [ \"$G\" != \"$U\" ] && [ -f \"$G/.claude/hooks/issue_filing_gate.py\" ] && [ -d \"$G/.paircoder\" ]; then H=\"$G\"; echo \"issue_filing_gate.py: CLAUDE_PROJECT_DIR=$U has no payload, resolving .claude/hooks from cwd checkout\" >&2; exec python3 \"$H/.claude/hooks/issue_filing_gate.py\"; fi; echo \"issue_filing_gate.py: refusing to exec -- no trusted .paircoder/ payload checkout found (CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>} cwd=$(pwd))\" >&2; exit 2; else if [ -z \"${CLAUDE_PROJECT_DIR:-}\" ]; then echo \"issue_filing_gate.py: CLAUDE_PROJECT_DIR unset, resolving .claude/hooks from cwd\" >&2; elif [ \"$H\" != \"${CLAUDE_PROJECT_DIR}\" ]; then echo \"issue_filing_gate.py: CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR} has no payload, resolving .claude/hooks from cwd checkout\" >&2; fi; exec python3 \"$H/.claude/hooks/issue_filing_gate.py\"; fi; else echo \"guard issue_filing_gate.py not found -- CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>} cwd=$(pwd)\" >&2; fi'"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bpsai-pair session check --quiet"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'H=\"${CLAUDE_PROJECT_DIR:-}\"; if [ -z \"$H\" ] || [ ! -f \"$H/.claude/hooks/command_intent_gate.py\" ]; then G=$(git rev-parse --show-toplevel 2>/dev/null); if [ -n \"$G\" ] && [ -f \"$G/.claude/hooks/command_intent_gate.py\" ]; then H=\"$G\"; else H=\".\"; fi; fi; if [ -f \"$H/.claude/hooks/command_intent_gate.py\" ]; then if [ ! -d \"$H/.paircoder\" ]; then U=\"$H\"; G=$(git rev-parse --show-toplevel 2>/dev/null); if [ -n \"$G\" ] && [ \"$G\" != \"$U\" ] && [ -f \"$G/.claude/hooks/command_intent_gate.py\" ] && [ -d \"$G/.paircoder\" ]; then H=\"$G\"; echo \"command_intent_gate.py: CLAUDE_PROJECT_DIR=$U has no payload, resolving .claude/hooks from cwd checkout\" >&2; exec python3 \"$H/.claude/hooks/command_intent_gate.py\"; fi; echo \"command_intent_gate.py: refusing to exec -- no trusted .paircoder/ payload checkout found (CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>} cwd=$(pwd))\" >&2; exit 2; else if [ -z \"${CLAUDE_PROJECT_DIR:-}\" ]; then echo \"command_intent_gate.py: CLAUDE_PROJECT_DIR unset, resolving .claude/hooks from cwd\" >&2; elif [ \"$H\" != \"${CLAUDE_PROJECT_DIR}\" ]; then echo \"command_intent_gate.py: CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR} has no payload, resolving .claude/hooks from cwd checkout\" >&2; fi; exec python3 \"$H/.claude/hooks/command_intent_gate.py\"; fi; else echo \"guard command_intent_gate.py not found -- CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>} cwd=$(pwd)\" >&2; fi'"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bpsai-pair compaction snapshot save --trigger \"$CLAUDE_COMPACT_TRIGGER\" --quiet"
+          }
+        ]
+      }
+    ],
+    "InstructionsLoaded": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bpsai-pair session check --quiet"
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bpsai-pair orchestrate evaluate teammate_idle --agent-id \"$CLAUDE_AGENT_ID\" --agent-type \"$CLAUDE_AGENT_TYPE\" --quiet"
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bpsai-pair orchestrate evaluate task_completed --agent-id \"$CLAUDE_AGENT_ID\" --agent-type \"$CLAUDE_AGENT_TYPE\" --quiet"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bpsai-pair history-log --quiet"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'bpsai-pair telemetry log-failure --trigger \"$CLAUDE_STOP_REASON\" --quiet 2>/dev/null || true'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'bpsai-pair context-sync --auto 2>/dev/null || true'"
+          },
+          {
+            "type": "command",
+            "command": "sh -c 'bpsai-pair state archive --auto 2>/dev/null || true'"
+          },
+          {
+            "type": "command",
+            "command": "sh -c 'bpsai-pair telemetry log-session-end --stop-reason \"$CLAUDE_STOP_REASON\" --quiet 2>/dev/null || true'"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'bpsai-pair telemetry log-subagent-outcome --stop-reason \"$CLAUDE_STOP_REASON\" --agent-id \"$CLAUDE_AGENT_ID\" --agent-type \"$CLAUDE_AGENT_TYPE\" --quiet 2>/dev/null || true'"
+          }
+        ]
+      }
+    ]
+  },
+  "skillOverrides": {
+    "managing-task-lifecycle": "user-invocable-only",
+    "planning-with-pm": "user-invocable-only",
+    "running-qc": "user-invocable-only",
+    "auditing-sibling-projects": "user-invocable-only"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bpsai-pair-statusline",
+    "padding": 0
+  }
+}

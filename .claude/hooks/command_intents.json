@@ -1,0 +1,52 @@
+{
+  "_comment": [
+    "Protected command vocabulary for command_intent_gate.py (UserPromptSubmit).",
+    "Adding a protected command is a DATA edit: append a row here.",
+    "  keyword          - first token of the prompt, matched case-insensitively,",
+    "                     with an optional leading slash (`/engage`).",
+    "  argument_pattern - regex the REST of the first line must fully match, so a",
+    "                     command shape fires and prose does not. Required: a bare",
+    "                     keyword with no argument never fires.",
+    "  contract         - text injected as additionalContext on a match.",
+    "Rows are tried in order and the first match wins, so several rows may",
+    "share a keyword: put the narrower shape first. A contract must be TRUE",
+    "for every target its pattern accepts -- state only routing the CLI",
+    "actually performs. `review` splits three ways for that reason: `review",
+    "pr` takes an integer; `review auto` resolves a task id; and no review",
+    "command addresses a named branch at all, so that row's contract says so",
+    "instead of promising a route that silently reviews the current checkout."
+  ],
+  "version": 1,
+  "intents": [
+    {
+      "id": "pc-plan",
+      "keyword": "pc-plan",
+      "argument_pattern": ".+",
+      "contract": "PairCoder command-vocabulary gate: the prompt is a `pc-plan` invocation naming a backlog file or a feature description.\n\nEnter Navigator role and follow the pc-plan recipe (`.claude/commands/pc-plan.md`): read the planning skill and current state, design the task breakdown, then run the plan gate -- `bpsai-pair budget check <task-id>` sums planned complexity against the sprint budget BEFORE the plan record is written (`enforcement.require_budget_check`). If the plan gate refuses, DO NOT proceed without user acknowledgment (an audited `--reason` bypass or a reduced scope). Always update state.md after planning."
+    },
+    {
+      "id": "engage",
+      "keyword": "engage",
+      "argument_pattern": "#?[\\w.@/\\\\-]+",
+      "contract": "PairCoder command-vocabulary gate: the prompt is an `engage` invocation.\n\nThis is a CLI invocation, not a natural-language request. Run `bpsai-pair engage <backlog>` now. Executing backlog tasks inline in this session is a violation of the engage contract. This invocation constitutes the user's standing authorization for background dispatch for this run. The engage CLI owns branch-cutting; do not commit to dev/main."
+    },
+    {
+      "id": "review-pr",
+      "keyword": "review",
+      "argument_pattern": "(pr\\s+)?#?\\d+",
+      "contract": "PairCoder command-vocabulary gate: the prompt is a `review` invocation naming a PR number.\n\nRun `bpsai-pair review pr <N>` from the TARGET REPO's working directory (the tool infers repo from cwd), with stdout captured to a file (full finding bodies exist only on stdout; findings.jsonl is a titles-only index). Reviewing the diff inline in this session is a violation of the review contract. Findings land in `.paircoder/reviews/findings.jsonl`."
+    },
+    {
+      "id": "review-task",
+      "keyword": "review",
+      "argument_pattern": "(T\\d+\\.\\d+|TASK-\\d+)",
+      "contract": "PairCoder command-vocabulary gate: the prompt is a `review` invocation naming a task id.\n\nRun `bpsai-pair review auto \"<task-id>\"` from the TARGET REPO's working directory (the tool infers repo from cwd) -- a task id is the one target `review auto` resolves, and it routes to `review task`, which reviews that task's changes. Capture stdout to a file (full finding bodies exist only on stdout; findings.jsonl is a titles-only index). Reviewing the diff inline in this session is a violation of the review contract. Findings land in `.paircoder/reviews/findings.jsonl`."
+    },
+    {
+      "id": "review-target",
+      "keyword": "review",
+      "argument_pattern": "(pr\\s+)?#?[\\w.@/\\\\-]+",
+      "contract": "PairCoder command-vocabulary gate: the prompt is a `review` invocation naming a branch or other non-PR, non-task target.\n\nNo review command takes a branch name. `bpsai-pair review auto` and `bpsai-pair review branch` review THE CURRENT CHECKOUT's diff against its base, and passing a branch as the argument does NOT review that target -- the argument is dropped and whatever branch is checked out is reviewed instead. So before running anything: confirm the named target IS the current branch (`git rev-parse --abbrev-ref HEAD`), and check it out first if it is not; if the target already has a PR, run `bpsai-pair review pr <N>` against that instead. Then run the review from the TARGET REPO's working directory (the tool infers repo from cwd), with stdout captured to a file (full finding bodies exist only on stdout; findings.jsonl is a titles-only index). Reviewing the diff inline in this session is a violation of the review contract. Findings land in `.paircoder/reviews/findings.jsonl`."
+    }
+  ]
+}
