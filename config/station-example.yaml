@@ -1,0 +1,49 @@
+# Example single-station configuration for Station Watch (HF1).
+# One camera, one station. Every key below is required; loading a config that
+# omits any of them raises a KeyError naming the missing key.
+
+station_id: station-1
+camera_id: cam-0
+
+# Cycle time (takt) and the grace period before a stall becomes a fault.
+takt_s: 30.0
+grace_s: 5.0
+
+# Slots that must hold a part, and zones a person must not enter.
+required_slots:
+  - slot_a
+  - slot_b
+keepout_zones:
+  - zone_press
+
+# Liveness / blind-detection thresholds.
+liveness_window_s: 3.0          # no frame within this window -> disconnected
+dark_luma_threshold: 15.0       # mean luma below this counts as dark
+dark_window_s: 2.0              # sustained darkness for this long -> dark
+frozen_frames: 30               # this many identical frames -> frozen
+recover_good_frames: 5          # consecutive good frames needed to clear blind
+
+# Runner loop and recovery.
+cycle_interval_s: 1.0           # one cycle every second, frame or not
+recover_healthy_verdicts: 3     # consecutive healthy verdicts to leave fault
+
+# Fiducial marker used to detect a shifted view.
+fiducial:
+  dictionary_id: DICT_4X4_50
+  marker_id: 0
+  expected_center_px: [640, 360]
+  tolerance_px: 20
+
+# Where alarms are raised.
+alarm:
+  sinks:
+    - screen
+    - sound
+
+# The independent watchdog rail.
+watchdog:
+  cycle_window_s: 10.0
+  alarm_eval_window_s: 10.0
+  sinks:
+    - screen
+    - sound

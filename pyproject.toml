@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "station-watch"
+version = "0.1.0"
+description = "Camera watch for one assembly station that flags stalls, missing parts and keep-out entries and alarms loudly when the camera goes blind"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "opencv-python",
+    "numpy",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+# Lint/format only the station-watch package and its tests. The .claude/ and
+# scripts/ trees are PairCoder framework payload (re-pinned on upgrade), not this
+# project's code, so they are out of scope for our lint gate.
+extend-exclude = [".claude", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
