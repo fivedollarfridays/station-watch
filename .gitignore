@@ -69,3 +69,8 @@ data/local/
 .coverage
 *.egg-info/
 .DS_Store
+
+# Secrets never enter this public repo
+.env
+.env.*
+!.env.example

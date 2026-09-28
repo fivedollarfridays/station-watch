@@ -116,6 +116,15 @@ token_budget:
 metrics:
   enabled: true
   store_path: .paircoder/history/metrics.jsonl
+architecture:
+  enabled: true
+  max_file_lines: 400
+  warning_file_lines: 200
+  max_function_lines: 50
+  max_functions_per_file: 15
+  max_imports: 20
+  test_max_file_lines: 600
+  test_warning_file_lines: 400
 hooks:
   enabled: true
   on_task_ready:
