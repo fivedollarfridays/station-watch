@@ -74,3 +74,10 @@ data/local/
 .env
 .env.*
 !.env.example
+
+# Station Watch: PairCoder bookkeeping carries local usernames and temp paths,
+# so it never enters this public repo. Listed after the managed block on purpose:
+# a directory-level ignore overrides the managed `!bypass_log.jsonl` re-include.
+.paircoder/history/
+.paircoder/engage/runs/
+docs/portfolio/
