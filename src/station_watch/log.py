@@ -85,9 +85,7 @@ class Log:
         self._path = Path(path)
         parent = self._path.parent
         if not parent.exists():
-            raise LogError(
-                f"log directory does not exist: {parent} (for log path {self._path})"
-            )
+            raise LogError(f"log directory does not exist: {parent} (for log path {self._path})")
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")

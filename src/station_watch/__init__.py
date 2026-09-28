@@ -10,6 +10,7 @@ from __future__ import annotations
 from station_watch.clock import offset_iso, parse_iso, utc_now_iso
 from station_watch.config import REQUIRED_KEYS, StationConfig, load_station_config
 from station_watch.fixtures import load_fixture_observations
+from station_watch.judge import Judge
 from station_watch.records import (
     AlarmEvaluated,
     BlindReason,
@@ -46,6 +47,7 @@ __all__ = [
     "REQUIRED_KEYS",
     "load_station_config",
     "load_fixture_observations",
+    "Judge",
     "new_run_id",
     "utc_now_iso",
     "parse_iso",

@@ -156,22 +156,28 @@ class BlindWatch:
         window_s = fid.get("window_s", _DEFAULT_FIDUCIAL_WINDOW_S)
         self._trackers = [
             BlindTracker(
-                BlindReason.FROZEN, FrozenMonitor(thresholds.frozen_frames),
-                thresholds.recover_good_frames, self._emit,
+                BlindReason.FROZEN,
+                FrozenMonitor(thresholds.frozen_frames),
+                thresholds.recover_good_frames,
+                self._emit,
             ),
             BlindTracker(
                 BlindReason.DARK,
                 DarkMonitor(thresholds.dark_luma_threshold, thresholds.dark_window_s),
-                thresholds.recover_good_frames, self._emit,
+                thresholds.recover_good_frames,
+                self._emit,
             ),
             BlindTracker(
-                BlindReason.FIDUCIAL_MISSING, FiducialMissingMonitor(window_s),
-                thresholds.recover_good_frames, self._emit,
+                BlindReason.FIDUCIAL_MISSING,
+                FiducialMissingMonitor(window_s),
+                thresholds.recover_good_frames,
+                self._emit,
             ),
             BlindTracker(
                 BlindReason.VIEW_SHIFTED,
                 ViewShiftedMonitor(fid["expected_center_px"], fid["tolerance_px"], window_s),
-                thresholds.recover_good_frames, self._emit,
+                thresholds.recover_good_frames,
+                self._emit,
             ),
         ]
         self._disconnected = DisconnectedTracker(

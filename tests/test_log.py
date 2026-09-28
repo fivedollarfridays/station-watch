@@ -165,9 +165,7 @@ def test_sigkill_midwrite_reopen_then_replay_has_no_duplicates(tmp_path):
     db = tmp_path / "log.db"
     run_id = "run-child-A"
     child = Path(__file__).parent / "_log_child.py"
-    proc = subprocess.Popen(
-        [sys.executable, str(child), str(db), run_id, BASE, "5000000"]
-    )
+    proc = subprocess.Popen([sys.executable, str(child), str(db), run_id, BASE, "5000000"])
     try:
         # let it commit a batch, then hard-kill mid-loop
         proc.wait(timeout=0.6)

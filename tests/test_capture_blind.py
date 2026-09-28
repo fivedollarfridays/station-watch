@@ -163,9 +163,7 @@ def test_frozen_opens_then_clears_after_recovery(tmp_path):
 
 
 def test_dark_opens_then_clears_after_recovery(tmp_path):
-    path = write_synth_clip(
-        tmp_path / "dk", frames=30, dark_from=5, dark_until=16, fps=20, seed=8
-    )
+    path = write_synth_clip(tmp_path / "dk", frames=30, dark_from=5, dark_until=16, fps=20, seed=8)
     log = Log(tmp_path / "dk.db")
     _run_clip(path, log, _thresholds(), real_time=True)
     _open_and_clear(log, BlindReason.DARK)
