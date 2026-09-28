@@ -18,10 +18,18 @@ Capture writes a ``disconnected`` BlindRecord at once and keeps retrying the
 device with capped exponential backoff (reopening it between tries), and the
 record clears only after good frames resume (K11). The liveness timer runs for
 the whole of :meth:`Capture.run`, independent of the read loop.
+
+A frame that reads fine but then fails to *process* (fingerprint, luma, noise,
+fiducial, blind evaluation or the Log append raising) must not kill the loop
+either: the error is reported once on stderr and recorded as the same
+``disconnected`` BlindRecord (evidence ``{"error": "<Type>: <message>"}``), one
+record per episode, cleared by the usual good-frame rule once frames process
+again.
 """
 
 from __future__ import annotations
 
+import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -38,6 +46,7 @@ from station_watch.records import FrameRecord
 _MONO_EPSILON = 1e-9
 _BACKOFF_START_S = 0.05
 _BACKOFF_MAX_S = 1.0
+_ERROR_MESSAGE_MAX = 200
 
 
 class Capture:
@@ -179,15 +188,40 @@ class Capture:
             mono = self._monotonic()
             if last_mono is not None and mono <= last_mono:
                 mono = last_mono + _MONO_EPSILON
-            record = self._record(frame, frame_id, mono)
-            log.append(record)
-            self.first_frame.set()
-            center = find_marker_center(frame, fiducial["dictionary_id"], fiducial["marker_id"])
-            watch.observe_frame(record, center)
-            self._prev = frame
+            try:
+                self._process(log, watch, fiducial, frame, frame_id, mono)
+                self._prev = frame
+            except Exception as exc:  # K1: a bad frame is recorded, never a dead thread
+                self._frame_failed(watch, exc, frame_id)
             last_mono = mono
             frame_id += 1
             self._pace(start, frame_id, interval)
+
+    def _process(
+        self, log, watch: BlindWatch, fiducial: dict, frame: np.ndarray, frame_id: int, mono: float
+    ) -> None:
+        """Stamp, log, and fan one frame out to the watch (may raise; the caller guards)."""
+        record = self._record(frame, frame_id, mono)
+        log.append(record)
+        self.first_frame.set()
+        center = find_marker_center(frame, fiducial["dictionary_id"], fiducial["marker_id"])
+        watch.observe_frame(record, center)
+
+    def _frame_failed(self, watch: BlindWatch, exc: Exception, frame_id: int) -> None:
+        """Record a per-frame processing error as ``disconnected``; report it once."""
+        self._prev = None
+        detail = f"{type(exc).__name__}: {str(exc)[:_ERROR_MESSAGE_MAX]}"
+        try:
+            opened = watch.read_failed({"error": detail})
+        except Exception as record_exc:  # the Log itself may be what is failing
+            detail = f"{detail} (and could not record it: {record_exc!r})"
+            opened = True
+        if opened:
+            print(
+                f"station-watch: capture frame {frame_id} processing failed: {detail}",
+                file=sys.stderr,
+                flush=True,
+            )
 
     def _read(self) -> tuple[np.ndarray | None, Exception | None]:
         """One read; K10: a read that raises is unobservable, never a crash."""

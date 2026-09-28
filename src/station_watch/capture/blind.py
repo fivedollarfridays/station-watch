@@ -125,12 +125,17 @@ class DisconnectedTracker:
             return
         self._open_with({"silent_seconds": silent_s, "liveness_window_s": self._window_s})
 
-    def read_failed(self, evidence: dict) -> None:
-        """A live read failed outright: open now (no need to wait out the window)."""
+    def read_failed(self, evidence: dict) -> bool:
+        """A read (or a frame's processing) failed outright: open now, no window wait.
+
+        Returns True only when this call opened the record, so a caller can report
+        an episode once instead of once per failing frame.
+        """
         if self._open:
             self._good_run = 0  # a failure mid-recovery restarts the good-frame count
-            return
+            return False
         self._open_with(evidence)
+        return True
 
     def _open_with(self, evidence: dict) -> None:
         self._open = True
@@ -212,10 +217,10 @@ class BlindWatch:
                 for tracker in self._fiducial_trackers:
                     tracker.observe(sample, record.frame_id)
 
-    def read_failed(self, evidence: dict) -> None:
-        """The source's read failed (returned nothing or raised): disconnected now."""
+    def read_failed(self, evidence: dict) -> bool:
+        """A read or per-frame processing failed: disconnected now; True if newly opened."""
         with self._lock:
-            self._disconnected.read_failed(evidence)
+            return self._disconnected.read_failed(evidence)
 
     def check_liveness(self, now_mono: float) -> None:
         with self._lock:

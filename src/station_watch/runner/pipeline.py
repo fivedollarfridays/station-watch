@@ -14,14 +14,17 @@ exactly the failure the Watchdog must catch (finding D1).
 
 Only a *recorded file read cleanly to its end* ends the run, after a short drain
 so a recovery can still land. A live device never ends it: an unplugged camera
-keeps Capture retrying while every cycle judges the station unobservable, and a
-Capture thread that dies for any other reason leaves the cycle loop running so
-the Judge's own frame-freshness check (K2) keeps the alarm up. A live run stops
+keeps Capture retrying while every cycle judges the station unobservable. Capture
+guards its own per-frame work, but if its thread exits anyway the cycle loop
+notices on its next cycle (a liveness check every cycle), says so once on stderr,
+and writes a ``disconnected`` BlindRecord naming the exit, so the Alarm fires and
+stays up rather than the run carrying on quietly. A live run stops
 on interrupt, :meth:`Runner.stop` (SIGTERM from the CLI), or ``--max-cycles``.
 """
 
 from __future__ import annotations
 
+import sys
 import threading
 from collections.abc import Callable
 
@@ -29,10 +32,11 @@ from station_watch.alarm.episodes import Alarm
 from station_watch.capture.capture import Capture
 from station_watch.clock import utc_now_iso
 from station_watch.judge import Judge
-from station_watch.records import CycleCompleted
+from station_watch.records import BlindReason, BlindRecord, BlindState, CycleCompleted
 from station_watch.runner.startup import RunContext
 
 _PIPELINE_STAGES = ("capture", "judge", "alarm")
+CAPTURE_THREAD_NAME = "station-watch-capture"
 
 
 def resolve_stages(stop_stage: str | None) -> tuple[str, ...]:
@@ -69,6 +73,8 @@ class Runner:
         self._speed = speed
         self._clock = clock
         self._stop = threading.Event()
+        self._capture_error: BaseException | None = None
+        self._capture_exit_reported = False
         self._judge = Judge(self._config, run_id=run_id, clock=clock)
         self._alarm = Alarm(self._config, run_id=run_id, sinks=context.sinks, clock=clock)
 
@@ -88,20 +94,53 @@ class Runner:
             speed=self._speed,
         )
         thread = threading.Thread(
-            target=capture.run, args=(self._log, self._thresholds), daemon=True
+            target=self._capture_main,
+            args=(capture,),
+            name=CAPTURE_THREAD_NAME,
+            daemon=True,
         )
         thread.start()
         # Give the source one liveness window to deliver its first frame before
         # judging, so a camera warming up is not reported as unplugged.
         capture.first_frame.wait(self._config.liveness_window_s)
         try:
-            self._cycle_loop(capture, observations)
+            self._cycle_loop(capture, thread, observations)
         except KeyboardInterrupt:
             pass
         finally:
             capture.stop()
             thread.join(timeout=2.0)
             self._source.release()
+
+    def _capture_main(self, capture: Capture) -> None:
+        """The Capture thread body; an escaping error is kept for the exit alarm."""
+        try:
+            capture.run(self._log, self._thresholds)
+        except Exception as exc:
+            self._capture_error = exc
+
+    def _check_capture_alive(self, capture: Capture, thread: threading.Thread, now: str) -> None:
+        """Alarm once, loudly, if the Capture thread has exited without finishing a file."""
+        if self._capture_exit_reported or thread.is_alive() or capture.stream_ended:
+            return
+        self._capture_exit_reported = True
+        exc = self._capture_error
+        cause = "" if exc is None else f": {type(exc).__name__}: {str(exc)[:200]}"
+        detail = f"capture thread exited unexpectedly{cause}"
+        print(f"station-watch: {detail}", file=sys.stderr, flush=True)
+        self._log.append(
+            BlindRecord(
+                station_id=self._config.station_id,
+                camera_id=self._config.camera_id,
+                ts=now,
+                reason=BlindReason.DISCONNECTED,
+                evidence={"error": detail},
+                last_good_frame_id=None,
+                state=BlindState.OPENED,
+                seq=0,  # Capture's own BlindWatch numbers from 1
+                run_id=self._run_id,
+            )
+        )
 
     def _load_observations(self, run_start_ts: str):
         if self._observations_path is None:
@@ -111,7 +150,7 @@ class Runner:
         loaded = load_fixture_observations(self._observations_path, run_start_ts, self._run_id)
         return sorted(loaded, key=lambda obs: obs.ts)
 
-    def _cycle_loop(self, capture: Capture, observations) -> None:
+    def _cycle_loop(self, capture: Capture, thread: threading.Thread, observations) -> None:
         obs_idx = 0
         cycle = 0
         drain = 0
@@ -120,6 +159,7 @@ class Runner:
             now = self._clock()
             obs_idx = self._flush_observations(observations, obs_idx, now)
             cycle += 1
+            self._check_capture_alive(capture, thread, now)
             self._run_cycle(now, cycle, stream_ended=capture.stream_ended)
             if self._max_cycles is not None and cycle >= self._max_cycles:
                 return

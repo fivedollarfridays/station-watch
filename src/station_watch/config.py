@@ -1,8 +1,9 @@
 """StationConfig: the per-station settings loaded from YAML.
 
 HF1 is single station -- one camera, one station. Loading a config that is
-missing any required key raises a ``KeyError`` whose message names that key
-(K9), so a misconfigured station fails loudly and specifically.
+missing any required key -- top-level or nested, e.g. ``watchdog.cycle_window_s``
+-- raises a ``KeyError`` whose message names the full dotted key (K9), so a
+misconfigured station fails loudly and specifically at startup, never mid-loop.
 """
 
 from __future__ import annotations
@@ -32,6 +33,31 @@ REQUIRED_KEYS = (
     "watchdog",
 )
 
+# Required sub-keys of each nested section (``fiducial.window_s`` is optional).
+REQUIRED_NESTED_KEYS = {
+    "fiducial": ("dictionary_id", "marker_id", "expected_center_px", "tolerance_px"),
+    "alarm": ("sinks",),
+    "watchdog": ("cycle_window_s", "alarm_eval_window_s", "sinks"),
+}
+
+
+def _missing(dotted: str) -> KeyError:
+    return KeyError(f"missing config key: {dotted}")
+
+
+def validate_required_keys(data: dict[str, Any]) -> None:
+    """Raise ``KeyError`` naming the first missing required key, as a dotted path."""
+    for key in REQUIRED_KEYS:
+        if key not in data:
+            raise _missing(key)
+    for section, keys in REQUIRED_NESTED_KEYS.items():
+        value = data[section]
+        if not isinstance(value, dict):
+            raise ValueError(f"config key {section} must be a mapping, got {type(value).__name__}")
+        for key in keys:
+            if key not in value:
+                raise _missing(f"{section}.{key}")
+
 
 @dataclass(frozen=True)
 class StationConfig:
@@ -54,9 +80,7 @@ class StationConfig:
 
     @classmethod
     def from_mapping(cls, data: dict[str, Any]) -> StationConfig:
-        for key in REQUIRED_KEYS:
-            if key not in data:
-                raise KeyError(f"StationConfig missing required key: {key}")
+        validate_required_keys(data)
         return cls(**{key: data[key] for key in REQUIRED_KEYS})
 
 

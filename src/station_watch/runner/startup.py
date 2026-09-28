@@ -47,7 +47,7 @@ def load_config(path: str) -> StationConfig:
     try:
         return load_station_config(path)
     except KeyError as exc:
-        raise StartupError(f"config is missing a required key: {exc.args[0]}") from exc
+        raise StartupError(str(exc.args[0])) from exc
     except (ValueError, OSError) as exc:
         raise StartupError(f"could not read config {path}: {exc}") from exc
 
