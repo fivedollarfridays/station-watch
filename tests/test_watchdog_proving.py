@@ -18,6 +18,7 @@ from pathlib import Path
 import yaml
 
 from station_watch.log import Log
+from station_watch.watchdog import age_seconds
 
 sys.path.insert(0, str(Path(__file__).parent))
 from helpers.synth_video import write_synth_clip  # noqa: E402
@@ -97,8 +98,31 @@ def _wait_until_cycles(logdb, at_least, deadline_s=10.0):
 # --- AC1: run --stop-stage alarm; watchdog fires for the alarm stage ----------
 
 
+def _assert_alarm_stage_fired_off_aged_rows(wd_record, logdb, frames_before, window_s, tick_s):
+    alarms = _alarm_events(wd_record)
+    causes = {a["cause"] for a in alarms}
+    assert "watchdog:alarm" in causes, f"watchdog should fire the alarm stage; got {causes}"
+    assert "watchdog:cycle" not in causes, "the cycle rail stayed live"
+    alarm_stage = next(a for a in alarms if a["cause"] == "watchdog:alarm")
+    assert "alarm stage silent" in alarm_stage["label"]
+    assert "old" in alarm_stage["label"], alarm_stage["label"]  # aged row, not "no rows"
+
+    with Log(logdb) as log:
+        evals = log.since(EPOCH, ["alarm_eval"])
+        cycles = log.since(EPOCH, ["cycle"])
+        assert len(log.since(EPOCH, ["frame"])) >= frames_before, "Capture kept running"
+    assert len(evals) == 5, "the Alarm ran for exactly the first 5 cycles"
+    assert all("alarm" not in c.stages for c in cycles[5:])
+    lag = age_seconds(evals[-1].ts, alarm_stage["started_ts"])
+    assert window_s < lag <= window_s + tick_s + 0.5, f"fired {lag:.2f}s after rows stopped"
+
+
 def test_watchdog_fires_for_the_alarm_stage_while_capture_keeps_running(tmp_path):
-    clip = write_synth_clip(tmp_path / "clip", frames=200, fps=50.0)
+    # The Alarm evaluates for 5 cycles, then stops while Capture and the cycle
+    # loop keep going: the D1 failure. The watchdog must name the alarm stage off
+    # the *aging* last row -- within its window plus one tick -- not merely
+    # because no row ever existed.
+    clip = write_synth_clip(tmp_path / "clip", frames=600, fps=50.0)
     config = _write_config(tmp_path / "station.yaml")
     logdb = tmp_path / "log.db"
     wd_record = tmp_path / "wd.jsonl"
@@ -115,12 +139,13 @@ def test_watchdog_fires_for_the_alarm_stage_while_capture_keeps_running(tmp_path
         str(tmp_path / "run-alarm.jsonl"),
         "--stop-stage",
         "alarm",
+        "--stop-stage-after",
+        "5",
         "--max-cycles",
         "80",
     )
     try:
         assert _wait_until_cycles(logdb, 3), "the run must be writing cycle rows"
-        frames_before = None
         with Log(logdb) as log:
             frames_before = len(log.since(EPOCH, ["frame"]))
 
@@ -134,20 +159,12 @@ def test_watchdog_fires_for_the_alarm_stage_while_capture_keeps_running(tmp_path
             "--interval",
             "0.2",
             "--max-checks",
-            "4",
+            "12",
         )
         assert watchdog.returncode == 0, watchdog.stderr
 
-        alarms = _alarm_events(wd_record)
-        causes = {a["cause"] for a in alarms}
-        assert "watchdog:alarm" in causes, f"watchdog should fire the alarm stage; got {causes}"
-        alarm_stage = next(a for a in alarms if a["cause"] == "watchdog:alarm")
-        assert "alarm" in alarm_stage["label"]
-
-        # Capture kept writing frames the whole time the watchdog fired.
+        _assert_alarm_stage_fired_off_aged_rows(wd_record, logdb, frames_before, 1.0, 0.2)
         assert run.poll() is None, "the run process must still be alive"
-        with Log(logdb) as log:
-            assert len(log.since(EPOCH, ["frame"])) >= frames_before
     finally:
         run.terminate()
         run.wait(timeout=10)

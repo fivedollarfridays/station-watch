@@ -38,10 +38,11 @@ from station_watch.log import Log
 from station_watch.records import BlindReason, BlindState
 
 sys.path.insert(0, str(Path(__file__).parent))
+from helpers.records import LiveCameraJudge  # noqa: E402
 from test_capture_blind import _GapSource  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG = ROOT / "config" / "station-example.yaml"
+CONFIG = Path(__file__).parent / "fixtures" / "station-slots.yaml"
 FIXTURES = Path(__file__).parent / "fixtures" / "observations"
 RUN = "run-alarm-test"
 START = "2026-09-28T00:00:00.000000+00:00"
@@ -72,12 +73,8 @@ def _at(offset_s):
 # --- AC1: proving test, real Capture -> Log -> Judge -> Alarm ----------------
 
 
-def test_pulled_cable_alarms_once_and_recovers_once(tmp_path):
-    # Empty slots/zones: a live camera judges healthy, a disconnected one is the
-    # only thing that can go wrong -- isolating the "pulled cable" round trip.
-    config = _config(required_slots=[], keepout_zones=[], recover_healthy_verdicts=2)
-    log = Log(tmp_path / "cable.db")
-    thresholds = BlindThresholds(
+def _cable_thresholds():
+    return BlindThresholds(
         liveness_window_s=0.2,
         dark_luma_threshold=15.0,
         dark_window_s=0.06,
@@ -91,13 +88,23 @@ def test_pulled_cable_alarms_once_and_recovers_once(tmp_path):
             "window_s": 1000.0,  # never trip fiducial: no marker in these frames
         },
     )
+
+
+def test_pulled_cable_alarms_once_and_recovers_once(tmp_path):
+    # Empty slots/zones: a live camera judges healthy, a disconnected one is the
+    # only thing that can go wrong -- isolating the "pulled cable" round trip.
+    config = _config(required_slots=[], keepout_zones=[], recover_healthy_verdicts=2)
+    log = Log(tmp_path / "cable.db")
+    thresholds = _cable_thresholds()
     source = _GapSource(before=3, gap_s=0.35, after=6)
-    Capture(
+    capture = Capture(
         source,
         station_id=config.station_id,
         camera_id=config.camera_id,
         run_id=RUN,
-    ).run(log, thresholds, poll_interval=0.02)
+    )
+    source.on_end = capture.stop
+    capture.run(log, thresholds, poll_interval=0.02)
 
     # Sanity: Capture really opened and cleared exactly one disconnected episode.
     blind = log.since(EPOCH, ["blind"])
@@ -146,7 +153,7 @@ def test_each_fault_opens_one_citing_episode(tmp_path, fixture, offset, cause):
     log = Log(tmp_path / "fault.db")
     _load(log, fixture)
     record_path = tmp_path / "alarm.jsonl"
-    judge = Judge(config, run_id=RUN)
+    judge = LiveCameraJudge(config, RUN)
     alarm = _record_alarm(config, record_path)
 
     # Two identical evaluations at the same instant: the second must not duplicate.
@@ -183,7 +190,7 @@ def test_alarm_evaluated_row_after_each_evaluation(tmp_path):
     log = Log(tmp_path / "eval.db")
     _load(log, "missing_part.jsonl")
     alarm = _record_alarm(config, tmp_path / "alarm.jsonl")
-    judge = Judge(config, run_id=RUN)
+    judge = LiveCameraJudge(config, RUN)
 
     for offset in (10.0, 20.0, 30.0):
         alarm.evaluate(judge.judge(log, _at(offset)), log)
@@ -280,7 +287,7 @@ def test_unobservable_without_a_named_reason_still_alarms(tmp_path):
     )
     record_path = tmp_path / "alarm.jsonl"
     alarm = _record_alarm(config, record_path)
-    alarm.evaluate(Judge(config, run_id=RUN).judge(log, _at(45.0)), log)
+    alarm.evaluate(LiveCameraJudge(config, RUN).judge(log, _at(45.0)), log)
 
     alarms = [e for e in _events(record_path) if e["event"] == "alarm"]
     assert len(alarms) == 1

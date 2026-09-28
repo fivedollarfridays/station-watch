@@ -28,11 +28,10 @@ schedule would attach.
 
 from __future__ import annotations
 
-from collections import defaultdict
-
 from station_watch.clock import parse_iso, utc_now_iso
+from station_watch.judge_inputs import JudgeInputs
 from station_watch.records import (
-    BlindState,
+    BlindReason,
     Fault,
     FaultKind,
     Observation,
@@ -41,8 +40,6 @@ from station_watch.records import (
     VerdictState,
 )
 
-_READ_KINDS = ("obs", "blind")
-_EPOCH = "0001-01-01T00:00:00.000000+00:00"
 _PART_KINDS = frozenset(
     {ObservationKind.PART_PRESENT, ObservationKind.PART_ABSENT, ObservationKind.PART_UNKNOWN}
 )
@@ -61,23 +58,36 @@ class Judge:
         self._run_id = run_id
         self._clock = clock
         self._seq = 0
+        self._inputs = JudgeInputs(camera_id=config.camera_id, run_id=run_id)
 
-    def judge(self, log, now_ts: str | None = None) -> Verdict:
-        """Judge the station as of ``now_ts`` (default: now), writing the verdict."""
+    def judge(self, log, now_ts: str | None = None, *, stream_ended: bool = False) -> Verdict:
+        """Judge the station as of ``now_ts`` (default: now), writing the verdict.
+
+        ``stream_ended`` is set by the Runner once a *recorded file* has been read
+        to its end: the last frames are then the whole story, not a camera that
+        went quiet, so frame freshness (K2) is not held against them.
+        """
         now = now_ts if now_ts is not None else self._clock()
-        records = [record for record in log.since(_EPOCH, _READ_KINDS) if record.ts <= now]
-        observations = [r for r in records if isinstance(r, Observation)]
-        verdict = self._verdict(observations, records, now)
+        self._inputs.refresh(log, now)
+        active = self._inputs.active_blind_reasons()
+        if not stream_ended and self._frames_stale(log, now):
+            active.add(BlindReason.DISCONNECTED)
+        verdict = self._verdict(sorted(active, key=lambda r: r.value), now)
         log.append(verdict)
         return verdict
 
-    def _verdict(self, observations, records, now: str) -> Verdict:
-        active = self._active_blind_reasons(records)
+    def _frames_stale(self, log, now: str) -> bool:
+        """K2 in the Judge itself: no frame of this run within the liveness window."""
+        newest = log.newest("frame", run_id=self._run_id, until=now)
+        if newest is None:
+            return True
+        age_s = (parse_iso(now) - parse_iso(newest.ts)).total_seconds()
+        return age_s > self._config.liveness_window_s
+
+    def _verdict(self, active, now: str) -> Verdict:
         if active:
             return self._build(VerdictState.UNOBSERVABLE, (), tuple(active), now)
-        by_target: dict[str, list[Observation]] = defaultdict(list)
-        for obs in observations:
-            by_target[obs.target].append(obs)
+        by_target = self._inputs.by_target
         faults = self._faults(by_target, now)
         if faults:
             return self._build(VerdictState.FAULT, tuple(faults), (), now)
@@ -96,17 +106,6 @@ class Judge:
             seq=self._seq,
             run_id=self._run_id,
         )
-
-    def _active_blind_reasons(self, records):
-        latest = {}
-        for record in records:
-            if getattr(record, "camera_id", None) != self._config.camera_id:
-                continue
-            current = latest.get(record.reason)
-            if current is None or (record.ts, record.seq) >= (current.ts, current.seq):
-                latest[record.reason] = record
-        active = [r for r, rec in latest.items() if rec.state == BlindState.OPENED]
-        return sorted(active, key=lambda reason: reason.value)
 
     def _faults(self, by_target, now: str) -> list[Fault]:
         return [

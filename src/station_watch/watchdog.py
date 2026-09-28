@@ -10,6 +10,12 @@ processes. A rail whose newest row is older than its window (``cycle_window_s`` 
 an alarm that names the stale stage, never a pass (K1). A missing or unreadable
 Log is itself an alarm.
 
+Startup grace: a rail with *no rows yet* is given one of its own windows,
+measured on the Watchdog's clock from its first check, before its absence counts
+as silence -- a Watchdog started alongside the run should not alarm on a pipeline
+that has not turned its first cycle. A stale row is never graced, and neither is
+a missing Log.
+
 The Watchdog alarms through its *own* sink instances, built from
 ``watchdog.sinks`` -- never through the pipeline process's rail (K8), so a stuck
 pipeline cannot also silence the alarm about it. This is the fix for finding D1:
@@ -86,10 +92,13 @@ class Watchdog:
         self._clock = clock
         self._sleep = sleep
         self._open: dict[str, Episode] = {}
+        self._started: str | None = None
 
     def check(self) -> dict[str, Episode]:
         """One judgement pass: open new silences, recover healed rails."""
         now = self._clock()
+        if self._started is None:
+            self._started = now
         self._reconcile(self._evaluate(now), now)
         return dict(self._open)
 
@@ -125,10 +134,14 @@ class Watchdog:
             raise WatchdogLogError(f"unreadable: {self._log_path}: {exc}") from exc
 
     def _stale_episode(self, stage: str, row, now: str) -> Episode | None:
-        if row is None:
-            return _stage_episode(self._station_id, stage, now, "no rows yet")
-        age = age_seconds(row.ts, now)
         window = self._windows[stage]
+        if row is None:
+            waited = age_seconds(self._started or now, now)
+            if waited <= window:
+                return None  # startup grace: the run has not written this rail yet
+            detail = f"no rows in {waited:.1f}s since watchdog start > {window:.1f}s window"
+            return _stage_episode(self._station_id, stage, now, detail)
+        age = age_seconds(row.ts, now)
         if age > window:
             detail = f"last row {age:.1f}s old > {window:.1f}s window"
             return _stage_episode(self._station_id, stage, now, detail)

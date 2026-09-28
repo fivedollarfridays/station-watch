@@ -1,7 +1,7 @@
 """Per-frame metrics derived from a decoded BGR frame.
 
 These are the numbers a :class:`~station_watch.records.FrameRecord` carries so a
-later component (HF1.4) can tell a live camera from a blind one without holding
+later component (the blind monitors) can tell a live camera from a blind one without holding
 the pixels: a raw-bytes ``fingerprint`` (frozen sensors repeat it), ``mean_luma``
 (a dark sensor drops it), and ``noise_score`` -- the mean absolute per-pixel
 difference from the previous frame, which is positive for a live still scene and

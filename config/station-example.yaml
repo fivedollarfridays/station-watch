@@ -1,6 +1,10 @@
 # Example single-station configuration for Station Watch (HF1).
 # One camera, one station. Every key below is required; loading a config that
 # omits any of them raises a KeyError naming the missing key.
+#
+# HF1 watches the CAMERA'S OWN HEALTH: frames arriving, not dark, not frozen,
+# and the fiducial marker in place. It works as-is with the README "Run it"
+# commands on the synthetic test clip (tests/helpers/synth_video.py).
 
 station_id: station-1
 camera_id: cam-0
@@ -10,11 +14,12 @@ takt_s: 30.0
 grace_s: 5.0
 
 # Slots that must hold a part, and zones a person must not enter.
-required_slots:
-  - slot_a
-  - slot_b
-keepout_zones:
-  - zone_press
+# Leave these empty in HF1: slot and zone readings come from Detect, which
+# arrives in HF2. A required slot with no reading is never assumed present, so
+# listing slots here without Detect keeps the station unobservable (and the
+# alarm up) forever -- by design, since nothing has confirmed the parts.
+required_slots: []
+keepout_zones: []
 
 # Liveness / blind-detection thresholds.
 liveness_window_s: 3.0          # no frame within this window -> disconnected
@@ -27,12 +32,16 @@ recover_good_frames: 5          # consecutive good frames needed to clear blind
 cycle_interval_s: 1.0           # one cycle every second, frame or not
 recover_healthy_verdicts: 3     # consecutive healthy verdicts to leave fault
 
-# Fiducial marker used to detect a shifted view.
+# Fiducial marker (the camera canary) used to detect a missing or shifted view.
+# These values match the synthetic test clip: a 40 px DICT_4X4_50 marker whose
+# center sits at (40, 40). For a real camera, put the printed marker in view and
+# set expected_center_px to where it appears; until then the fiducial_missing
+# alarm stays up, which is the canary doing its job.
 fiducial:
   dictionary_id: DICT_4X4_50
   marker_id: 0
-  expected_center_px: [640, 360]
-  tolerance_px: 20
+  expected_center_px: [40, 40]
+  tolerance_px: 10
   window_s: 1.0                 # marker missing/shifted for this long -> blind
 
 # Where alarms are raised.

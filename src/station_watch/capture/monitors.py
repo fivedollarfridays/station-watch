@@ -11,6 +11,10 @@ the fiducial's location) and answers two questions the generic
   frozen sensor needs ``frozen_frames`` identical frames; dark/fiducial faults
   must hold for a whole window so a single flickered frame never trips them.
 
+A monitor may also answer ``bad = None``: this frame cannot be judged for its
+condition at all (``view_shifted`` with no marker found). Such a frame neither
+counts toward recovery nor resets it.
+
 Monitors are stateful (they remember the run/window so far) but never emit; the
 tracker owns the opened/cleared decision and the Log.
 """
@@ -113,18 +117,19 @@ class ViewShiftedMonitor:
         self._tolerance = tolerance_px
         self._sustained = _SustainedFor(window_s)
 
-    def evaluate(self, sample: Sample) -> tuple[bool, bool, dict]:
+    def evaluate(self, sample: Sample) -> tuple[bool, bool | None, dict]:
         evidence: dict = {
             "expected_center": list(self._expected),
             "tolerance_px": self._tolerance,
         }
         center = sample.marker_center
         if center is None:
-            bad = False  # a missing marker is FiducialMissingMonitor's business
-        else:
-            offset = math.hypot(center[0] - self._expected[0], center[1] - self._expected[1])
-            bad = offset > self._tolerance
-            evidence["center"] = [center[0], center[1]]
-            evidence["offset_px"] = offset
+            # No marker, no position: this frame says nothing about the view
+            # (a missing marker is FiducialMissingMonitor's business).
+            return False, None, evidence
+        offset = math.hypot(center[0] - self._expected[0], center[1] - self._expected[1])
+        bad = offset > self._tolerance
+        evidence["center"] = [center[0], center[1]]
+        evidence["offset_px"] = offset
         tripped = self._sustained.update(bad, sample.mono)
         return tripped, bad, evidence

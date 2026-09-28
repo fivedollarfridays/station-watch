@@ -2,9 +2,9 @@
 
 macOS plays the tone with ``afplay``; Linux with ``aplay``; anywhere else (or
 when no player is on PATH) it falls back to the terminal bell. Playback runs
-through an injectable runner and is wrapped so a missing or failing audio player
-can never delay or crash the alarm -- the record and screen sinks have already
-fired by then.
+through an injectable runner that launches the player *asynchronously* (never
+waits for it) and is wrapped so a missing, slow or failing audio player can never
+delay or crash the alarm or the cycle loop.
 """
 
 from __future__ import annotations
@@ -19,7 +19,14 @@ from station_watch.alarm.tone import default_tone_path, generate_tone_wav
 
 
 def _default_runner(command) -> None:
-    subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    """Launch the player and return at once: the tone must never stall a cycle."""
+    subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
 
 
 class SoundSink(Sink):

@@ -56,7 +56,9 @@ CREATE TABLE IF NOT EXISTS records (
     ts        TEXT NOT NULL,
     run_id    TEXT NOT NULL,
     body      TEXT NOT NULL
-)
+);
+CREATE INDEX IF NOT EXISTS records_kind_ts ON records (kind, ts);
+CREATE INDEX IF NOT EXISTS records_kind_run_ts ON records (kind, run_id, ts)
 """
 
 
@@ -78,6 +80,19 @@ def _rebuild(data: dict):
     return _KIND_TO_CLASS[_kind_of(data["record_id"])].from_dict(data)
 
 
+def _newest_sql(kind: str, run_id: str | None, until: str | None) -> tuple[str, tuple]:
+    """The indexed newest-first query for ``kind`` (shared with the plan test)."""
+    clauses, params = ["kind = ?"], [kind]
+    if run_id is not None:
+        clauses.append("run_id = ?")
+        params.append(run_id)
+    if until is not None:
+        clauses.append("ts <= ?")
+        params.append(until)
+    where = " AND ".join(clauses)
+    return f"SELECT body FROM records WHERE {where} ORDER BY ts DESC, rowid DESC", tuple(params)
+
+
 class Log:
     """The single append-only store; one instance is the sole writer."""
 
@@ -90,7 +105,7 @@ class Log:
         self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute(_SCHEMA)
+        self._conn.executescript(_SCHEMA)
         self._conn.commit()
 
     def append(self, record) -> None:
@@ -106,20 +121,42 @@ class Log:
             )
             self._conn.commit()
 
-    def newest(self, kind: str, **match):
-        """Newest row of ``kind`` whose fields equal ``match`` (or ``None``)."""
-        canonical = _KIND_ALIASES.get(kind, kind)
+    def newest(self, kind: str, *, run_id: str | None = None, until: str | None = None, **match):
+        """Newest row of ``kind`` (optionally of one run, at or before ``until``).
+
+        ``run_id`` and ``until`` are answered by an index; any other ``match``
+        fields are compared on rows streamed newest-first, so the common case
+        (no extra fields) reads exactly one row whatever the Log's size.
+        """
+        sql, params = _newest_sql(_KIND_ALIASES.get(kind, kind), run_id, until)
         wanted = {key: _coerce(value) for key, value in match.items()}
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT body FROM records WHERE kind = ? ORDER BY ts DESC, rowid DESC",
-                (canonical,),
-            ).fetchall()
-        for (body,) in rows:
-            data = json.loads(body)
-            if all(data.get(key) == value for key, value in wanted.items()):
-                return _rebuild(data)
+            for (body,) in self._conn.execute(sql, params):
+                data = json.loads(body)
+                if all(data.get(key) == value for key, value in wanted.items()):
+                    return _rebuild(data)
         return None
+
+    def read_new(self, cursor: int, kinds, *, run_id: str) -> tuple[int, list]:
+        """Rows of ``kinds`` for ``run_id`` appended after ``cursor``, in insert order.
+
+        Returns ``(new_cursor, records)``; pass ``new_cursor`` back next time to
+        read incrementally. The cursor is the SQLite rowid, so the read is a range
+        scan over only the rows appended since the last call.
+        """
+        canonical = [_KIND_ALIASES.get(kind, kind) for kind in kinds]
+        placeholders = ",".join("?" for _ in canonical)
+        with self._lock:
+            # Bound the read by the newest rowid first, so a row committed by
+            # another connection mid-read is picked up next time, never skipped.
+            newest = self._conn.execute("SELECT MAX(rowid) FROM records").fetchone()[0] or 0
+            rows = self._conn.execute(
+                f"SELECT rowid, body FROM records WHERE rowid > ? AND rowid <= ? "
+                f"AND run_id = ? AND kind IN ({placeholders}) ORDER BY rowid ASC",
+                (cursor, newest, run_id, *canonical),
+            ).fetchall()
+        records = [_rebuild(json.loads(body)) for _rowid, body in rows]
+        return max(cursor, newest), records
 
     def since(self, ts: str, kinds):
         """All rows of the given ``kinds`` with ``ts >= ts``, oldest first."""

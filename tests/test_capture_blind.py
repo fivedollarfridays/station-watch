@@ -219,7 +219,12 @@ class _HungSource:
 
 
 class _GapSource:
-    """Live frames, then one read stalls past the window, then frames resume."""
+    """Live frames, then one read stalls past the window, then frames resume.
+
+    A live device never "ends" (an empty read is a failure, not a finish), so the
+    script's end stops the Capture through ``on_end`` -- the test's hand on the
+    power switch -- rather than by returning nothing.
+    """
 
     is_file = False
     fps = 0.0
@@ -229,11 +234,13 @@ class _GapSource:
         self._i = 0
         self._gap_s = gap_s
         self._rng = np.random.default_rng(0)
+        self.on_end = lambda: None
 
     def read(self):
-        op = self._ops[self._i]
+        op = self._ops[min(self._i, len(self._ops) - 1)]
         self._i += 1
         if op == "stop":
+            self.on_end()
             return None
         if op == "gap":
             time.sleep(self._gap_s)
@@ -273,6 +280,7 @@ def test_disconnected_opens_then_clears_when_frames_resume(tmp_path):
     log = Log(tmp_path / "gap.db")
     thresholds = _thresholds(liveness_window_s=0.2, recover_good_frames=3)
     cap = Capture(source, station_id=STATION, camera_id=CAMERA, run_id=RUN)
+    source.on_end = cap.stop
     cap.run(log, thresholds, poll_interval=0.02)
 
     _open_and_clear(log, BlindReason.DISCONNECTED)

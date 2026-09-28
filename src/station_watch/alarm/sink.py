@@ -79,12 +79,14 @@ class ScreenSink(Sink):
             f"ALARM  {episode.station_id}  {episode.label}  "
             f"since {episode.started_ts}  frames={list(episode.frame_ids)}",
             file=self._stream,
+            flush=True,
         )
 
     def on_recovery(self, episode, recovered_ts: str) -> None:
         print(
             f"CLEAR  {episode.station_id}  {episode.label}  recovered {recovered_ts}",
             file=self._stream,
+            flush=True,
         )
 
 

@@ -76,6 +76,8 @@ class BlindTracker:
 
     def observe(self, sample: Sample, frame_id: int) -> None:
         tripped, bad, evidence = self._monitor.evaluate(sample)
+        if bad is None:
+            return  # not evaluable on this frame: neither good nor bad
         if not self._open:
             if not bad:
                 self._last_good_frame_id = frame_id
@@ -121,14 +123,19 @@ class DisconnectedTracker:
     def check(self, silent_s: float) -> None:
         if self._open or silent_s < self._window_s:
             return
+        self._open_with({"silent_seconds": silent_s, "liveness_window_s": self._window_s})
+
+    def read_failed(self, evidence: dict) -> None:
+        """A live read failed outright: open now (no need to wait out the window)."""
+        if self._open:
+            self._good_run = 0  # a failure mid-recovery restarts the good-frame count
+            return
+        self._open_with(evidence)
+
+    def _open_with(self, evidence: dict) -> None:
         self._open = True
         self._good_run = 0
-        self._emit(
-            BlindReason.DISCONNECTED,
-            BlindState.OPENED,
-            {"silent_seconds": silent_s, "liveness_window_s": self._window_s},
-            self._last_good_frame_id,
-        )
+        self._emit(BlindReason.DISCONNECTED, BlindState.OPENED, evidence, self._last_good_frame_id)
 
 
 class BlindWatch:
@@ -154,29 +161,29 @@ class BlindWatch:
         self._last_frame_mono: float | None = None
         fid: dict[str, Any] = thresholds.fiducial
         window_s = fid.get("window_s", _DEFAULT_FIDUCIAL_WINDOW_S)
-        self._trackers = [
+        self._dark_luma = thresholds.dark_luma_threshold
+        recover = thresholds.recover_good_frames
+        self._scene_trackers = [
             BlindTracker(
-                BlindReason.FROZEN,
-                FrozenMonitor(thresholds.frozen_frames),
-                thresholds.recover_good_frames,
-                self._emit,
+                BlindReason.FROZEN, FrozenMonitor(thresholds.frozen_frames), recover, self._emit
             ),
             BlindTracker(
                 BlindReason.DARK,
                 DarkMonitor(thresholds.dark_luma_threshold, thresholds.dark_window_s),
-                thresholds.recover_good_frames,
+                recover,
                 self._emit,
             ),
+        ]
+        # A dark frame hides the marker too: one cause (dark), not a second
+        # fiducial episode, so the fiducial trackers skip dark frames.
+        self._fiducial_trackers = [
             BlindTracker(
-                BlindReason.FIDUCIAL_MISSING,
-                FiducialMissingMonitor(window_s),
-                thresholds.recover_good_frames,
-                self._emit,
+                BlindReason.FIDUCIAL_MISSING, FiducialMissingMonitor(window_s), recover, self._emit
             ),
             BlindTracker(
                 BlindReason.VIEW_SHIFTED,
                 ViewShiftedMonitor(fid["expected_center_px"], fid["tolerance_px"], window_s),
-                thresholds.recover_good_frames,
+                recover,
                 self._emit,
             ),
         ]
@@ -199,8 +206,16 @@ class BlindWatch:
         with self._lock:
             self._last_frame_mono = record.capture_mono
             self._disconnected.frame_arrived(record.frame_id)
-            for tracker in self._trackers:
+            for tracker in self._scene_trackers:
                 tracker.observe(sample, record.frame_id)
+            if sample.mean_luma >= self._dark_luma:
+                for tracker in self._fiducial_trackers:
+                    tracker.observe(sample, record.frame_id)
+
+    def read_failed(self, evidence: dict) -> None:
+        """The source's read failed (returned nothing or raised): disconnected now."""
+        with self._lock:
+            self._disconnected.read_failed(evidence)
 
     def check_liveness(self, now_mono: float) -> None:
         with self._lock:

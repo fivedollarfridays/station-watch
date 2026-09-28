@@ -8,16 +8,21 @@ a ``CycleCompleted`` row -- so the pipeline's own liveness is on the record for
 the Watchdog to judge (K7).
 
 ``--stop-stage alarm`` (test and drill use only) truncates the per-cycle stage
-list before the Alarm, so Capture and the cycle loop keep running while the Alarm
-stops evaluating: exactly the failure the Watchdog must catch (finding D1). A
-file source ends the run when it is exhausted, after a short drain so a recovery
-can still land; a live device runs until interrupted or ``--max-cycles``.
+list before the Alarm (after ``--stop-stage-after`` full cycles, default 0), so
+Capture and the cycle loop keep running while the Alarm stops evaluating:
+exactly the failure the Watchdog must catch (finding D1).
+
+Only a *recorded file read cleanly to its end* ends the run, after a short drain
+so a recovery can still land. A live device never ends it: an unplugged camera
+keeps Capture retrying while every cycle judges the station unobservable, and a
+Capture thread that dies for any other reason leaves the cycle loop running so
+the Judge's own frame-freshness check (K2) keeps the alarm up. A live run stops
+on interrupt, :meth:`Runner.stop` (SIGTERM from the CLI), or ``--max-cycles``.
 """
 
 from __future__ import annotations
 
 import threading
-import time
 from collections.abc import Callable
 
 from station_watch.alarm.episodes import Alarm
@@ -46,11 +51,11 @@ class Runner:
         *,
         run_id: str,
         stop_stage: str | None = None,
+        stop_stage_after: int = 0,
         observations_path: str | None = None,
         max_cycles: int | None = None,
         speed: float = 1.0,
         clock: Callable[[], str] = utc_now_iso,
-        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._config = context.config
         self._source = context.source
@@ -58,13 +63,18 @@ class Runner:
         self._thresholds = context.thresholds
         self._run_id = run_id
         self._stages = resolve_stages(stop_stage)
+        self._stop_stage_after = stop_stage_after
         self._observations_path = observations_path
         self._max_cycles = max_cycles
         self._speed = speed
         self._clock = clock
-        self._sleep = sleep
+        self._stop = threading.Event()
         self._judge = Judge(self._config, run_id=run_id, clock=clock)
         self._alarm = Alarm(self._config, run_id=run_id, sinks=context.sinks, clock=clock)
+
+    def stop(self) -> None:
+        """Ask the cycle loop to finish its current cycle and shut down cleanly."""
+        self._stop.set()
 
     def run(self) -> None:
         """Start Capture, drive the cycle loop, and shut both down cleanly."""
@@ -81,8 +91,11 @@ class Runner:
             target=capture.run, args=(self._log, self._thresholds), daemon=True
         )
         thread.start()
+        # Give the source one liveness window to deliver its first frame before
+        # judging, so a camera warming up is not reported as unplugged.
+        capture.first_frame.wait(self._config.liveness_window_s)
         try:
-            self._cycle_loop(thread, observations)
+            self._cycle_loop(capture, observations)
         except KeyboardInterrupt:
             pass
         finally:
@@ -98,20 +111,19 @@ class Runner:
         loaded = load_fixture_observations(self._observations_path, run_start_ts, self._run_id)
         return sorted(loaded, key=lambda obs: obs.ts)
 
-    def _cycle_loop(self, thread: threading.Thread, observations) -> None:
+    def _cycle_loop(self, capture: Capture, observations) -> None:
         obs_idx = 0
         cycle = 0
         drain = 0
         drain_target = self._config.recover_healthy_verdicts + 2
-        while True:
-            self._sleep(self._config.cycle_interval_s)
+        while not self._stop.wait(self._config.cycle_interval_s):
             now = self._clock()
             obs_idx = self._flush_observations(observations, obs_idx, now)
             cycle += 1
-            self._run_cycle(now, cycle)
+            self._run_cycle(now, cycle, stream_ended=capture.stream_ended)
             if self._max_cycles is not None and cycle >= self._max_cycles:
                 return
-            if not thread.is_alive():
+            if capture.stream_ended:
                 drain += 1
                 if drain >= drain_target:
                     return
@@ -123,13 +135,12 @@ class Runner:
             idx += 1
         return idx
 
-    def _run_cycle(self, now: str, cycle: int) -> None:
-        verdict = self._judge.judge(self._log, now)
-        if "alarm" in self._stages:
+    def _run_cycle(self, now: str, cycle: int, *, stream_ended: bool) -> None:
+        stages = self._stages if cycle > self._stop_stage_after else _PIPELINE_STAGES
+        verdict = self._judge.judge(self._log, now, stream_ended=stream_ended)
+        if "alarm" in stages:
             self._alarm.evaluate(verdict, self._log)
-        self._log.append(
-            CycleCompleted(ts=now, cycle=cycle, stages=self._stages, run_id=self._run_id)
-        )
+        self._log.append(CycleCompleted(ts=now, cycle=cycle, stages=stages, run_id=self._run_id))
 
 
 __all__ = ["Runner", "resolve_stages"]

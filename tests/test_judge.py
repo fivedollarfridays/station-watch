@@ -28,10 +28,11 @@ from station_watch.records import (
 )
 
 sys.path.insert(0, str(Path(__file__).parent))
+from helpers.records import LiveCameraJudge  # noqa: E402
 from helpers.synth_video import write_synth_clip  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG = ROOT / "config" / "station-example.yaml"
+CONFIG = Path(__file__).parent / "fixtures" / "station-slots.yaml"
 FIXTURES = Path(__file__).parent / "fixtures" / "observations"
 RUN = "run-judge-test"
 START = "2026-09-28T00:00:00.000000+00:00"
@@ -42,7 +43,8 @@ def _config():
 
 
 def _judge(config):
-    return Judge(config, run_id=RUN)
+    # Fixture observations over a live camera: fresh frames at every judged ts.
+    return LiveCameraJudge(config, RUN)
 
 
 def _at(offset_s):
@@ -166,7 +168,7 @@ def test_a_frozen_blind_record_makes_the_stall_timeline_unobservable(tmp_path):
     )
     capture.run(log, thresholds)
 
-    verdict = _judge(config).judge(log, _at(100.0))
+    verdict = Judge(config, run_id=RUN).judge(log, _at(100.0))
 
     assert verdict.state == VerdictState.UNOBSERVABLE
     assert BlindReason.FROZEN in verdict.blind_reasons

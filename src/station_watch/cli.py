@@ -8,6 +8,7 @@ precondition is missing (K9); the message names the piece.
 from __future__ import annotations
 
 import argparse
+import signal
 import sys
 
 from station_watch.run import new_run_id
@@ -45,6 +46,14 @@ def _add_run_parser(sub) -> None:
         choices=["alarm"],
         help="TEST AND DRILL USE ONLY: keep Capture and the cycle loop running while the named "
         "stage stops (alarm: the Alarm stops evaluating) -- the condition the Watchdog catches",
+    )
+    run.add_argument(
+        "--stop-stage-after",
+        type=int,
+        default=0,
+        metavar="N",
+        help="TEST AND DRILL USE ONLY: run the full pipeline for N cycles before --stop-stage "
+        "takes effect, so the stopped stage's rows exist and then go stale",
     )
     run.add_argument(
         "--alarm-record",
@@ -104,13 +113,18 @@ def _run(args) -> int:
         context,
         run_id=new_run_id(),
         stop_stage=args.stop_stage,
+        stop_stage_after=args.stop_stage_after,
         observations_path=args.observations,
         max_cycles=args.max_cycles,
         speed=args.speed,
     )
+    # SIGTERM (a service manager stopping the watch) finishes the current cycle
+    # and shuts down cleanly, like Ctrl-C does.
+    previous = signal.signal(signal.SIGTERM, lambda _sig, _frame: runner.stop())
     try:
         runner.run()
     finally:
+        signal.signal(signal.SIGTERM, previous)
         context.log.close()
     return 0
 

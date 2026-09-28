@@ -144,7 +144,12 @@ def test_no_alarm_eval_rows_at_all_fires_the_alarm_stage(tmp_path):
     logdb = tmp_path / "log.db"
     _seed_log(logdb, cycle_ts="2026-09-28T12:00:09.000000+00:00")  # cycles, but no alarm_eval
     sink = SpySink()
-    _watchdog(logdb, sink, "2026-09-28T12:00:10.000000+00:00").check()
+    clock = {"now": "2026-09-28T12:00:10.000000+00:00"}
+    watchdog = Watchdog(_config(), sinks=[sink], log_path=logdb, clock=lambda: clock["now"])
+    watchdog.check()  # first check: inside the startup grace (see test_watchdog_grace.py)
+    _seed_log(logdb, cycle_ts="2026-09-28T12:00:12.000000+00:00", cycle=2)
+    clock["now"] = "2026-09-28T12:00:12.500000+00:00"  # past the 2s grace, cycles still fresh
+    watchdog.check()
     assert [e.cause for e in sink.alarms] == ["watchdog:alarm"]
 
 

@@ -23,7 +23,7 @@ HF1 builds every component except Detect. In HF1 the only real input path is cam
 
 **Repo constraints.**
 - This is a PUBLIC repo. Never commit footage, private paths, hostnames, secrets, or anything from `.paircoder/context/` or `.paircoder/tasks/`. Test video is generated at test time into a temp dir (synthetic frames with sensor noise); do not commit binary video.
-- Keep every source file under 400 lines; split before that. `bpsai-pair arch check --strict src tests` must pass.
+- Keep every source file under 400 lines; split before that. `bpsai-pair arch check --strict src` and `bpsai-pair arch check --strict tests` must both pass.
 - Do not edit README's "Status" section or the principles table. README "Run it" text is HF1.8's job only.
 - Do not register anything persistent (cron, launchd, services) from a task worktree.
 - Every task is test first: write the failing proving test, then the code.
@@ -159,7 +159,7 @@ Each blind condition clears only after `recover_good_frames` good frames (K11), 
 - [ ] Watchdog with a missing Log path alarms rather than exiting quietly (test)
 - [ ] Every module under `src/station_watch/` is imported by the runner or watchdog path (a test asserts this)
 - [ ] README has a "Run it" section whose commands are exercised by tests; README Status and principles sections unchanged
-- [ ] CI green: ruff check, ruff format --check, pytest; `bpsai-pair arch check --strict src tests` passes
+- [ ] CI green: ruff check, ruff format --check, pytest; `bpsai-pair arch check --strict src` and `bpsai-pair arch check --strict tests` both pass
 
 **Depends on:** HF1.7
 **Model:** claude-opus-4-8

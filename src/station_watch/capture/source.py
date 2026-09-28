@@ -45,6 +45,15 @@ class FrameSource:
             return None
         return frame
 
+    def reopen(self) -> None:
+        """Release and reopen the device (a replugged camera needs a fresh handle).
+
+        Never raises: if the device is still gone the new handle simply reads
+        nothing, and Capture retries again after its backoff.
+        """
+        self._cap.release()
+        self._cap = cv2.VideoCapture(self._spec)
+
     def release(self) -> None:
         """Release the underlying capture device or file handle."""
         self._cap.release()
