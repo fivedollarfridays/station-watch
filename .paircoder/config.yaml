@@ -2,8 +2,7 @@ version: 2.49.9
 project:
   name: Station Watch
   description: Station Watch project
-  primary_goal: Camera watch for one assembly station that flags stalls, missing parts
-    and keep-out entries and alarms loudly when the camera goes blind
+  primary_goal: Camera watch for one assembly station that flags stalls, missing parts and keep-out entries and alarms loudly when the camera goes blind
   coverage_target: 90
 workflow:
   default_branch_type: feature
@@ -180,3 +179,25 @@ containment:
   - api.trello.com
   - github.com
   - pypi.org
+overrides:
+  pack.excludes:
+    value:
+    - .git
+    - .venv
+    - __pycache__
+    - node_modules
+    - dist
+    - build
+    - '*.log'
+    - '*.bak'
+    - '*.egg-info'
+    - .pytest_cache
+    - .mypy_cache
+    - .ruff_cache
+    - htmlcov
+    - .coverage
+    - dist/
+    - build/
+    - '*.whl'
+    - '*.tar.gz'
+    reason: "preserving your local override ['.git', '.venv', '__pycache__', 'node_modules', 'dist', 'build', '*.log', '*.bak', '*.egg-info', '.pytest_cache', '.mypy_cache', '.ruff_cache', 'htmlcov', '.coverage', 'dist/', 'build/', '*.whl', '*.tar.gz'] (canonical: ['.git', '.venv', '__pycache__', 'node_modules', 'dist', 'build', '*.log', '*.bak']); add rationale or delete the override"

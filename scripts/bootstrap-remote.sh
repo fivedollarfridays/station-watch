@@ -43,9 +43,9 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ] \
 fi
 
 # Pin to exact version — prevents supply chain attacks from auto-installing
-# compromised future releases. Bumped each release; see the releasing-versions
-# skill. Invariant enforced by tools/cli/tests/core/test_bootstrap_remote.py
-# (compares this value to tools/cli/pyproject.toml).
+# compromised future releases. Maintained by the paircoder release/upgrade
+# payload -- do not hand-edit; `bpsai-pair upgrade` overwrites this value
+# from the current payload template.
 PINNED_VERSION="2.49.9"
 
 # Core runtime deps — the minimum set CLI startup needs to import without
@@ -64,17 +64,16 @@ PINNED_VERSION="2.49.9"
 #   tenacity           — gitops/retry.py, re-exported by gitops/__init__.py
 # Verified empirically: a venv with just these can run `bpsai-pair --version`,
 # `status`, and every hook command wired in `.claude/settings.json`.
-# Drift guard: tests/core/test_bootstrap_startup_import_coverage.py walks the
-# whole module-level import graph reachable from `commands/__init__.py` and
-# `gitops/__init__.py` and fails when this array does not cover it.
+# Drift guard: maintained by the paircoder release process against the
+# CLI's own import graph -- do not hand-edit; kept in sync automatically
+# by `bpsai-pair upgrade`.
 #
 # Exact-pinned (== not a range) -- same supply-chain rationale as
 # PINNED_VERSION above: an unpinned array let every cloud session
 # auto-install the LATEST release of each dep, undermining that
 # rationale for everything BUT the wheel itself. Each pin must also
-# satisfy pyproject.toml's own declared range for that dependency --
-# enforced by tests/core/test_bootstrap_remote_dep_pins.py. Bump
-# alongside PINNED_VERSION on the release checklist.
+# Maintained by the paircoder release/upgrade payload alongside
+# PINNED_VERSION above -- do not hand-edit.
 CORE_DEPS=(typer==0.27.1 click==8.4.2 rich==15.0.0 tiktoken==0.13.0 pyyaml==6.0.3 pydantic==2.13.4 httpx==0.28.1 packaging==26.3 platformdirs==4.11.1 tenacity==9.1.4)
 
 # Resolve the project root from THIS SCRIPT's location, never from the cwd.
