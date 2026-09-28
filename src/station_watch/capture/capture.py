@@ -14,11 +14,14 @@ sound ordering key even when frames arrive faster than the clock's resolution.
 
 from __future__ import annotations
 
+import threading
 import time
 from collections.abc import Callable, Iterator
 
 import numpy as np
 
+from station_watch.capture.blind import BlindThresholds, BlindWatch
+from station_watch.capture.fiducial import find_marker_center
 from station_watch.capture.metrics import fingerprint, mean_luma, noise_score
 from station_watch.capture.source import FrameSource
 from station_watch.clock import utc_now_iso
@@ -54,6 +57,11 @@ class Capture:
         self._clock = clock
         self._monotonic = monotonic
         self._sleep = sleep
+        self._stopped = False
+
+    def stop(self) -> None:
+        """Ask :meth:`run` to leave its loop after the current frame."""
+        self._stopped = True
 
     def _interval(self) -> float:
         """Seconds to hold between file frames (0.0 for a live device)."""
@@ -104,3 +112,68 @@ class Capture:
         delay = target - self._monotonic()
         if delay > 0:
             self._sleep(delay)
+
+    def run(self, log, thresholds: BlindThresholds, *, poll_interval: float | None = None) -> None:
+        """Drive the source to exhaustion, writing frame and blind records to ``log``.
+
+        Every frame becomes a ``FrameRecord`` in ``log``; a :class:`BlindWatch`
+        turns per-frame metrics (and the fiducial's location) into ``BlindRecord``s.
+        A daemon timer thread calls :meth:`BlindWatch.check_liveness` so a hung
+        read still yields ``disconnected`` from off the frame loop.
+        """
+        watch = BlindWatch(
+            thresholds,
+            station_id=self._station_id,
+            camera_id=self._camera_id,
+            run_id=self._run_id,
+            sink=log.append,
+            clock=self._clock,
+        )
+        start = self._monotonic()
+        watch.start(start)
+        stop_event = threading.Event()
+        timer = threading.Thread(
+            target=self._liveness_loop,
+            args=(watch, stop_event, thresholds.liveness_window_s, poll_interval),
+            daemon=True,
+        )
+        timer.start()
+        try:
+            self._drive(log, watch, thresholds.fiducial, start)
+        finally:
+            stop_event.set()
+            timer.join(timeout=1.0)
+
+    def _drive(self, log, watch: BlindWatch, fiducial: dict, start: float) -> None:
+        """The frame loop: read, stamp, log, and fan each frame out to the watch."""
+        interval = self._interval()
+        self._prev = None
+        last_mono: float | None = None
+        frame_id = 0
+        while not self._stopped:
+            try:
+                frame = self._source.read()
+            except Exception:  # K10: a read that raises is unobservable, not a crash
+                return
+            if frame is None:
+                return
+            mono = self._monotonic()
+            if last_mono is not None and mono <= last_mono:
+                mono = last_mono + _MONO_EPSILON
+            record = self._record(frame, frame_id, mono)
+            log.append(record)
+            center = find_marker_center(frame, fiducial["dictionary_id"], fiducial["marker_id"])
+            watch.observe_frame(record, center)
+            self._prev = frame
+            last_mono = mono
+            frame_id += 1
+            self._pace(start, frame_id, interval)
+
+    def _liveness_loop(
+        self, watch: BlindWatch, stop_event: threading.Event, window_s: float, poll: float | None
+    ) -> None:
+        """Poll liveness on the timer's own clock until the loop stops."""
+        interval = poll if poll is not None else max(window_s / 4.0, 0.01)
+        while not stop_event.is_set():
+            watch.check_liveness(self._monotonic())
+            stop_event.wait(interval)

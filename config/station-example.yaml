@@ -33,6 +33,7 @@ fiducial:
   marker_id: 0
   expected_center_px: [640, 360]
   tolerance_px: 20
+  window_s: 1.0                 # marker missing/shifted for this long -> blind
 
 # Where alarms are raised.
 alarm:
