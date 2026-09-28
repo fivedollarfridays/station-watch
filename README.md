@@ -25,6 +25,32 @@ Everything runs on one local edge box. Footage does not leave the building.
 
 Capture, Detect, Judge, Log, Alarm, plus an optional local Explain step, a read-only Board for the supervisor, and a Watchdog on its own clock. Each component is built after the one that feeds it and ships with its own proving test.
 
+## Run it
+
+Install the package (Python 3.12+) into a virtualenv:
+
+```bash
+pip install -e .
+```
+
+Watch a live webcam (device index `0`), raising alarms on screen and through the buzzer named in the config:
+
+```bash
+station-watch run --config config/station-example.yaml --source 0 --log station.db
+```
+
+Watch a recorded file instead of a camera (any path OpenCV can open):
+
+```bash
+station-watch run --config config/station-example.yaml --source clip.mkv --log station.db
+```
+
+Start the Watchdog in a second terminal, on its own clock and its own alarm rail (K7, K8), so a stalled or dead run is caught even though it shares the Log:
+
+```bash
+station-watch watchdog --config config/station-example.yaml --log station.db
+```
+
 ## Design principles
 
 These are ideas carried over from patterns run in production, rewritten fresh for a plant floor. No code is imported.

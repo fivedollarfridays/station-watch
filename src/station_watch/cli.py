@@ -13,6 +13,7 @@ import sys
 from station_watch.run import new_run_id
 from station_watch.runner.pipeline import Runner
 from station_watch.runner.startup import StartupError, build_context
+from station_watch.watchdog import build_watchdog
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -21,6 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
     _add_run_parser(sub)
+    _add_watchdog_parser(sub)
     return parser
 
 
@@ -61,6 +63,32 @@ def _add_run_parser(sub) -> None:
     )
 
 
+def _add_watchdog_parser(sub) -> None:
+    watchdog = sub.add_parser(
+        "watchdog",
+        help="a second clock on its own rail that fires when the run goes silent",
+        description="Judge the run's cycle and alarm rails on the Watchdog's own clock and "
+        "sinks (K7, K8); a stale, absent, or unreadable Log is an alarm, not a pass.",
+    )
+    watchdog.add_argument("--config", required=True, help="path to the station config YAML")
+    watchdog.add_argument("--log", required=True, help="path to the run's append-only Log")
+    watchdog.add_argument(
+        "--alarm-record",
+        help="output file for the 'record' watchdog sink (one JSON line per alarm and recovery)",
+    )
+    watchdog.add_argument(
+        "--interval",
+        type=float,
+        default=1.0,
+        help="seconds between checks; a stale rail fires within its window plus one such tick",
+    )
+    watchdog.add_argument(
+        "--max-checks",
+        type=int,
+        help="stop after this many checks (bounds a drill or test run)",
+    )
+
+
 def _run(args) -> int:
     try:
         context = build_context(
@@ -87,11 +115,26 @@ def _run(args) -> int:
     return 0
 
 
+def _watchdog(args) -> int:
+    try:
+        watchdog = build_watchdog(args.config, args.log, record_path=args.alarm_record)
+    except StartupError as exc:
+        print(f"station-watch: {exc}", file=sys.stderr)
+        return 1
+    try:
+        watchdog.run(interval_s=args.interval, max_checks=args.max_checks)
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "run":
         return _run(args)
+    if args.command == "watchdog":
+        return _watchdog(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 
