@@ -1,0 +1,76 @@
+.venv/
+.venv-experimental/
+__pycache__/
+*.pyc
+agent_pack.tgz
+*.bak
+
+# PairCoder — ephemeral/session data
+#
+# `.claude/` is TRACKED on purpose (pc#1124): it is the orchestration
+# config this repo receives -- guard hooks, skills, agents, slash
+# commands, settings.json -- not runtime state. Only the genuinely
+# machine-local / runtime subset below is ignored (per-developer override,
+# per-session driver worktrees, per-role agent memory). `.claude/agent-memory/`
+# is now unconditionally ignored (pc#910): it is driver scratch memory, not
+# task output, so it is forced churn rather than a by-hand per-repo choice.
+.claude/.settings-*.tmp
+.claude/agent-memory/**
+.claude/settings.local.json
+.claude/worktrees/**
+.paircoder/.cli_version
+.paircoder/cache/**
+.paircoder/engage/runs/*.log
+.paircoder/engage/runs/base_attestations.json
+.paircoder/feedback/**
+.paircoder/history/benchmarks/matrix/**
+.paircoder/hooks/**
+.paircoder/reviews/**
+.paircoder/telemetry/**
+.paircoder/data/
+
+# Persistent advisory lock file for the status.yaml writer (fcntl locks are
+# never unlinked)
+docs/portfolio/status.yaml.lock
+
+# >>> paircoder managed
+.claude/.settings-*.tmp
+.claude/agent-memory/**
+.claude/settings.local.json
+.claude/worktrees/**
+.paircoder/.cli_version
+.paircoder/cache/**
+.paircoder/engage/runs/*.log
+.paircoder/engage/runs/base_attestations.json
+.paircoder/feedback/**
+.paircoder/history/benchmarks/matrix/**
+.paircoder/hooks/**
+.paircoder/reviews/**
+.paircoder/telemetry/**
+docs/portfolio/status.yaml.lock
+.paircoder/history/*
+!.paircoder/history/bypass_log.jsonl
+!.paircoder/history/archived-tasks/
+# <<< paircoder managed
+
+# Station Watch: internal agent context stays private (public repo push guard)
+.paircoder/context/
+.paircoder/tasks/
+
+# Local footage and runtime data never leave the box
+data/local/
+*.mp4
+*.avi
+*.mkv
+!tests/fixtures/**/*.mp4
+
+.pytest_cache/
+.ruff_cache/
+.coverage
+*.egg-info/
+.DS_Store
+
+# Secrets never enter this public repo
+.env
+.env.*
+!.env.example

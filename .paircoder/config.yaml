@@ -1,0 +1,203 @@
+version: 2.49.9
+project:
+  name: Station Watch
+  description: Station Watch project
+  primary_goal: Camera watch for one assembly station that flags stalls, missing parts and keep-out entries and alarms loudly when the camera goes blind
+  coverage_target: 90
+workflow:
+  default_branch_type: feature
+  main_branch: main
+  require_feature_branch: true
+  context_dir: .paircoder/context
+  plans_dir: .paircoder/plans
+  tasks_dir: .paircoder/tasks
+pack:
+  default_name: agent_pack.tgz
+  excludes:
+  - .git
+  - .venv
+  - __pycache__
+  - node_modules
+  - dist
+  - build
+  - '*.log'
+  - '*.bak'
+  - '*.egg-info'
+  - .pytest_cache
+  - .mypy_cache
+  - .ruff_cache
+  - htmlcov
+  - .coverage
+  - dist/
+  - build/
+  - '*.whl'
+  - '*.tar.gz'
+models:
+  navigator: claude-opus-4-8
+  driver: claude-opus-4-8
+  nayru: claude-opus-4-8
+  vaivora: claude-opus-4-8
+  bellona: claude-sonnet-5
+  divona: claude-sonnet-5
+  laverna: claude-sonnet-5
+  providers:
+    anthropic:
+      models:
+      - claude-opus-4-8
+      - claude-sonnet-5
+      - claude-haiku-4-5
+      default_effort: medium
+routing:
+  by_complexity:
+    trivial:
+      max_score: 6
+      model: claude-haiku-4-5
+    simple:
+      max_score: 39
+      model: claude-sonnet-5
+    moderate:
+      max_score: 60
+      model: claude-opus-4-8
+    complex:
+      max_score: 80
+      model: claude-opus-4-8
+    epic:
+      max_score: 100
+      model: claude-opus-4-8
+  overrides:
+    bellona: claude-opus-4-8
+    architecture: claude-opus-4-8
+estimation:
+  complexity_to_hours:
+    xs:
+      range:
+      - 0
+      - 15
+      hours:
+      - 0.5
+      - 1.0
+      - 2.0
+    s:
+      range:
+      - 16
+      - 30
+      hours:
+      - 1.0
+      - 2.0
+      - 4.0
+    m:
+      range:
+      - 31
+      - 50
+      hours:
+      - 2.0
+      - 4.0
+      - 8.0
+    l:
+      range:
+      - 51
+      - 75
+      hours:
+      - 4.0
+      - 8.0
+      - 16.0
+    xl:
+      range:
+      - 76
+      - 100
+      hours:
+      - 8.0
+      - 16.0
+      - 32.0
+token_budget:
+  warning_threshold: 75
+  critical_threshold: 90
+metrics:
+  enabled: true
+  store_path: .paircoder/history/metrics.jsonl
+architecture:
+  enabled: true
+  max_file_lines: 400
+  warning_file_lines: 200
+  max_function_lines: 50
+  max_functions_per_file: 15
+  max_imports: 20
+  test_max_file_lines: 600
+  test_warning_file_lines: 400
+hooks:
+  enabled: true
+  on_task_ready:
+  - sync_pm
+  - update_state
+  on_task_start:
+  - select_model
+  - check_token_budget
+  - start_timer
+  - sync_pm
+  - update_state
+  on_task_review:
+  - sync_pm
+  - update_state
+  on_task_complete:
+  - arch_check_modified
+  - contract_break_check
+  - stop_timer
+  - workspace_impact_scan
+  - telemetry_snapshot
+  - calibration_update_incremental
+  - feedback_calibrate
+  - sync_pm
+  - update_state
+  - check_unblocked
+  on_task_block:
+  - sync_pm
+  - update_state
+pm:
+  provider: none
+  workflow: simple
+containment:
+  enabled: false
+  mode: strict
+  auto_checkpoint: true
+  rollback_on_violation: false
+  blocked_directories: []
+  blocked_files:
+  - .env
+  - .env.local
+  - .env.production
+  - credentials.json
+  - secrets.yaml
+  readonly_directories:
+  - .claude/agents
+  - .claude/commands
+  - .claude/skills
+  readonly_files:
+  - CLAUDE.md
+  - AGENTS.md
+  allow_network:
+  - api.anthropic.com
+  - api.trello.com
+  - github.com
+  - pypi.org
+overrides:
+  pack.excludes:
+    value:
+    - .git
+    - .venv
+    - __pycache__
+    - node_modules
+    - dist
+    - build
+    - '*.log'
+    - '*.bak'
+    - '*.egg-info'
+    - .pytest_cache
+    - .mypy_cache
+    - .ruff_cache
+    - htmlcov
+    - .coverage
+    - dist/
+    - build/
+    - '*.whl'
+    - '*.tar.gz'
+    reason: "preserving your local override ['.git', '.venv', '__pycache__', 'node_modules', 'dist', 'build', '*.log', '*.bak', '*.egg-info', '.pytest_cache', '.mypy_cache', '.ruff_cache', 'htmlcov', '.coverage', 'dist/', 'build/', '*.whl', '*.tar.gz'] (canonical: ['.git', '.venv', '__pycache__', 'node_modules', 'dist', 'build', '*.log', '*.bak']); add rationale or delete the override"
