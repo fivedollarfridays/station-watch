@@ -47,6 +47,8 @@ station-watch run --config config/station-example.yaml --source clip.mkv --log s
 
 The example config watches the camera's own health: frames arriving, not dark, not frozen, and the fiducial marker in place. Its marker position matches the synthetic test clip, so for a real camera put the printed marker in view and set `fiducial.expected_center_px` to where it appears; until then the "fiducial missing" alarm stays up, which is the canary doing its job. Parts slots stay empty until Detect lands in HF2. A recorded file ends the run when it has been read to the end; a live camera never does, so an unplugged camera raises the "disconnected" alarm and the run keeps retrying it until you stop it (Ctrl-C or SIGTERM).
 
+Detect runs automatically when the config lists rail positions or zones under `detect`: Capture reads those targets from the same frames and appends the observations to the Log for the Judge, so a missing or unseated part becomes a fault. The example config lists none, so it stays camera-health only. `--observations` is fixture input for drills and is refused alongside a `detect` config with targets — one source of observations per run.
+
 Start the Watchdog in a second terminal, on its own clock and its own alarm rail (K7, K8), so a stalled or dead run is caught even though it shares the Log:
 
 ```bash

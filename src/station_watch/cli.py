@@ -105,6 +105,7 @@ def _run(args) -> int:
             source_spec=args.source,
             log_path=args.log,
             alarm_record=args.alarm_record,
+            observations_path=args.observations,
         )
     except StartupError as exc:
         print(f"station-watch: {exc}", file=sys.stderr)

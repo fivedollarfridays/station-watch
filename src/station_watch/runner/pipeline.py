@@ -31,6 +31,7 @@ from collections.abc import Callable
 from station_watch.alarm.episodes import Alarm
 from station_watch.capture.capture import Capture
 from station_watch.clock import utc_now_iso
+from station_watch.detect.detector import build_detector
 from station_watch.judge import Judge
 from station_watch.records import BlindReason, BlindRecord, BlindState, CycleCompleted
 from station_watch.runner.startup import RunContext
@@ -93,6 +94,7 @@ class Runner:
             run_id=self._run_id,
             speed=self._speed,
             clock=self._clock,
+            detector=build_detector(self._config, self._run_id),
         )
         thread = threading.Thread(
             target=self._capture_main,

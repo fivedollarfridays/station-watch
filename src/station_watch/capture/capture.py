@@ -41,6 +41,7 @@ from station_watch.capture.fiducial import find_marker_center
 from station_watch.capture.metrics import fingerprint, mean_luma, noise_score
 from station_watch.capture.source import FrameSource
 from station_watch.clock import utc_now_iso
+from station_watch.detect.detector import CAUSE_DETECT_ERROR, Detector
 from station_watch.records import FrameRecord
 
 _MONO_EPSILON = 1e-9
@@ -64,6 +65,7 @@ class Capture:
         clock: Callable[[], str] = utc_now_iso,
         monotonic: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
+        detector: Detector | None = None,
     ):
         if speed <= 0:
             raise ValueError(f"speed must be positive, got {speed}")
@@ -76,6 +78,8 @@ class Capture:
         self._clock = clock
         self._monotonic = monotonic
         self._sleep = sleep
+        self._detector = detector
+        self._detect_error_reported = False
         self._stopped = False
         self._stop_event = threading.Event()
         self.first_frame = threading.Event()
@@ -206,6 +210,32 @@ class Capture:
         self.first_frame.set()
         center = find_marker_center(frame, fiducial["dictionary_id"], fiducial["marker_id"])
         watch.observe_frame(record, center)
+        if self._detector is not None:
+            self._detect(log, frame, record.frame_id, record.ts)
+
+    def _detect(self, log, frame: np.ndarray, frame_id: int, ts: str) -> None:
+        """Run Detect on this frame and append its rows (same serialized Log writer).
+
+        A Detect exception must not kill Capture and must not look like a
+        disconnected camera: every target reads ``part_unknown`` with cause
+        ``detect_error`` and the error text, reported once on stderr per episode
+        (a later clean read ends the episode).
+        """
+        try:
+            observations = self._detector.process(frame, frame_id, ts)
+            self._detect_error_reported = False
+        except Exception as exc:  # a Detect fault is unknown, never a false disconnect
+            detail = f"{type(exc).__name__}: {str(exc)[:_ERROR_MESSAGE_MAX]}"
+            if not self._detect_error_reported:
+                self._detect_error_reported = True
+                print(
+                    f"station-watch: detect frame {frame_id} failed: {detail}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+            observations = self._detector.unknown_all(frame_id, ts, CAUSE_DETECT_ERROR, detail)
+        for observation in observations:
+            log.append(observation)
 
     def _frame_failed(self, watch: BlindWatch, exc: Exception, frame_id: int) -> None:
         """Record a per-frame processing error as ``disconnected``; report it once."""

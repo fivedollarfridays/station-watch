@@ -17,6 +17,7 @@ from station_watch.alarm.sink import AlarmError, Sink, build_sinks
 from station_watch.capture.blind import BlindThresholds
 from station_watch.capture.source import CaptureError, FrameSource
 from station_watch.config import StationConfig, load_station_config
+from station_watch.detect.detector import detect_targets_configured
 from station_watch.log import Log, LogError
 
 
@@ -77,10 +78,20 @@ def open_source(spec: str) -> FrameSource:
 
 
 def build_context(
-    *, config_path: str, source_spec: str, log_path: str, alarm_record: str | None
+    *,
+    config_path: str,
+    source_spec: str,
+    log_path: str,
+    alarm_record: str | None,
+    observations_path: str | None = None,
 ) -> RunContext:
     """Validate and open everything the runner needs; raise StartupError on any gap."""
     config = load_config(config_path)
+    if observations_path is not None and detect_targets_configured(config):
+        raise StartupError(
+            "--observations (fixture input) and a detect config with targets both supply "
+            "observations; use one source per run (drop --observations or the detect targets)"
+        )
     sinks = build_alarm_sinks(config, record_path=alarm_record)
     log = open_log(log_path)
     try:
