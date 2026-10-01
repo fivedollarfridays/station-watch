@@ -27,9 +27,17 @@ from station_watch.evaluate.provenance import (
     git_commit,
     write_measurement,
 )
+from station_watch.physics.exposure_blur import ExposureBlur
+from station_watch.physics.flicker import Flicker
 from station_watch.physics.fps_sweep import FpsSweep
+from station_watch.physics.occlusion import Occlusion
 
-SCRIPTS = {FpsSweep.name: FpsSweep()}
+SCRIPTS = {
+    FpsSweep.name: FpsSweep(),
+    Occlusion.name: Occlusion(),
+    ExposureBlur.name: ExposureBlur(),
+    Flicker.name: Flicker(),
+}
 
 PHYSICS_DIR = Path("measurements/physics")
 V1_DIR = Path("measurements/v1")

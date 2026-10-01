@@ -19,6 +19,8 @@ sessions:
           - {start_frame: 40, end_frame: 110}
         keepouts:                        # a person in a keep-out zone
           - {zone: zone_press, start_frame: 20, end_frame: 35}
+        occlusions:                      # a rail position covered (e.g. by a hand)
+          - {target: rail_pos_1, start_frame: 30, end_frame: 60}
         camera_faults:                   # injected sensor faults, with a start frame
           - {reason: dark, start_frame: 60}
         creeps:                          # a cycle-time-creep interval (K12)
@@ -79,6 +81,7 @@ class ClipLabel:
     keepouts: list[dict] = field(default_factory=list)
     camera_faults: list[dict] = field(default_factory=list)
     creeps: list[dict] = field(default_factory=list)
+    occlusions: list[dict] = field(default_factory=list)
     tags: dict = field(default_factory=dict)
 
 
@@ -136,6 +139,7 @@ def _clip_label(session: str, entry: dict, clips_dir: Path) -> ClipLabel:
         keepouts=list(entry.get("keepouts", [])),
         camera_faults=list(entry.get("camera_faults", [])),
         creeps=list(entry.get("creeps", [])),
+        occlusions=list(entry.get("occlusions", [])),
         tags=dict(entry.get("tags", {})),
     )
 

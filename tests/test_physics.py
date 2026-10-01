@@ -171,6 +171,73 @@ def test_synthetic_writes_only_to_out(tmp_path, monkeypatch):
     assert not (tmp_path / "measurements" / "v1").exists()
 
 
+# --- occlusion AC1: synthetic occlusion-unknown fractions match rendered shares ----
+
+
+def test_occlusion_synthetic_matches_rendered_shares(tmp_path):
+    out = tmp_path / "occlusion.json"
+    rc = main(["measure", "occlusion", "--synthetic", "--out", str(out)])
+    assert rc == 0
+    data = json.loads(out.read_text())
+    assert data["provenance"]["dataset_kind"] == "synthetic"
+    metrics = data["metrics"]
+
+    # Two tagged camera angles, each reporting a slot-judgment count it actually made.
+    by_angle = metrics["by_angle"]
+    assert len(by_angle) == 2, by_angle
+    assert metrics["slot_judgments_total"] == sum(a["slot_judgments"] for a in by_angle.values())
+    assert metrics["slot_judgments_total"] > 0
+
+    for angle, block in by_angle.items():
+        rendered = block["rendered_occlusion_fraction"]
+        measured = block["occlusion_unknown_fraction"]
+        # The occlusion-caused unknown fraction tracks the rendered occluded share.
+        assert abs(measured - rendered) <= 0.05, (angle, measured, rendered)
+        # It actually ran Detect: the blob drove real part_unknown readings.
+        assert measured > 0.0, angle
+        assert block["unknown_by_cause"].get("occluded", 0) > 0, angle
+        # The unknown fraction is at least the occlusion-caused part, and occlusion
+        # is the dominant cause in this clean synthetic (no dark/blur/missing marker).
+        assert block["unknown_fraction"] >= block["occlusion_unknown_fraction"] - 1e-9
+        assert block["longest_unknown_run_s"] > 0.0, angle
+
+    # The two angles are distinct and carry distinct rendered shares (a steeper
+    # angle occludes more), so the table shows occlusion climbing with angle.
+    shares = sorted(b["rendered_occlusion_fraction"] for b in by_angle.values())
+    assert shares[0] < shares[1]
+
+
+def test_occlusion_synthetic_writes_only_to_out(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    out = tmp_path / "proof.json"
+    assert main(["measure", "occlusion", "--synthetic", "--out", str(out)]) == 0
+    assert out.exists()
+    assert not (tmp_path / "measurements" / "physics").exists()
+    assert not (tmp_path / "measurements" / "v1").exists()
+
+
+# --- occlusion AC2: no clips -> a no_input file with no numeric results ------------
+
+
+def test_occlusion_no_clips_writes_no_input(tmp_path):
+    out = tmp_path / "occlusion.json"
+    rc = main(["measure", "occlusion", "--out", str(out)])
+    assert rc == 0
+    data = json.loads(out.read_text())
+    assert data["status"] == "no_input"
+    assert "clips" in data["reason"].lower()
+    assert "metrics" not in data
+    assert not _has_number(data)
+
+
+def test_committed_occlusion_file_is_no_input():
+    path = ROOT / "measurements" / "physics" / "occlusion.json"
+    assert path.exists(), "the occlusion no_input file must be committed"
+    data = json.loads(path.read_text())
+    assert data["status"] == "no_input"
+    assert "metrics" not in data
+
+
 # --- AC3: the committed physics files are no_input, no stray synthetic ---------
 
 

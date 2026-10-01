@@ -1,0 +1,9 @@
+{
+  "command": "station-watch measure occlusion",
+  "provenance": {
+    "date_utc": "2026-10-01",
+    "git_commit": "338492d81dcdb9ab02d8bcdb0b3bb533bd78c1d7"
+  },
+  "reason": "no --clips given",
+  "status": "no_input"
+}
