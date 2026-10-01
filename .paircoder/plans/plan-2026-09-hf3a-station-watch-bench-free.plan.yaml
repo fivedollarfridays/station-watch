@@ -1,0 +1,31 @@
+id: plan-2026-09-hf3a-station-watch-bench-free
+title: Hf3A Station Watch Bench Free
+type: feature
+status: in_progress
+created_at: '2026-10-01T04:34:44.622734+00:00'
+skills:
+- planning-with-pm
+phases:
+- id: 1
+  tasks:
+  - HF3A.1
+- id: 2
+  tasks:
+  - HF3A.2
+- id: 3
+  tasks:
+  - HF3A.3
+  - HF3A.4
+  - HF3A.5
+- id: 4
+  tasks:
+  - HF3A.6
+- id: 5
+  tasks:
+  - HF3A.7
+metadata:
+  source_backlog: plans/backlogs/HF3A-station-watch-bench-free.md
+  scope:
+    scope: story
+    reason: Total cx 23 fits within sprint budget 300
+    suggested_sprints: 1
