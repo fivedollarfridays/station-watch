@@ -26,6 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_watchdog_parser(sub)
     _add_fetch_model_parser(sub)
     _add_evaluate_parser(sub)
+    _add_board_parser(sub)
     return parser
 
 
@@ -121,8 +122,20 @@ def _add_evaluate_parser(sub) -> None:
     add_parser(sub)
 
 
+def _add_board_parser(sub) -> None:
+    from station_watch.board.commandline import add_parser
+
+    add_parser(sub)
+
+
 def _evaluate(args) -> int:
     from station_watch.evaluate.commandline import handle
+
+    return handle(args)
+
+
+def _board(args) -> int:
+    from station_watch.board.commandline import handle
 
     return handle(args)
 
@@ -202,6 +215,8 @@ def main(argv: list[str] | None = None) -> int:
         return _fetch_model(args)
     if args.command == "evaluate":
         return _evaluate(args)
+    if args.command == "board":
+        return _board(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 
