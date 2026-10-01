@@ -245,15 +245,19 @@ def test_startup_unwritable_log_exits_nonzero_and_names_it(tmp_path):
 
 
 def test_observations_fixture_reaches_the_judge(tmp_path):
+    # A station with no Detect targets may still take fixture observations as a
+    # drill input (HF2.6 refuses --observations only alongside a Detect config --
+    # see test_runner_detect). A no_motion row with a zero stall window reaches the
+    # Judge like any other input and opens a stall episode.
     clip = write_synth_clip(tmp_path / "clip", frames=40, fps=20.0)
-    config = _write_config(tmp_path / "station.yaml", keepout_zones=["zone_press"])
+    config = _write_config(tmp_path / "station.yaml", takt_s=0.0, grace_s=0.0)
     obs = tmp_path / "obs.jsonl"
     obs.write_text(
         json.dumps(
             {
                 "station_id": "station-1",
                 "frame_id": 5,
-                "kind": "person_in_keepout",
+                "kind": "no_motion",
                 "target": "zone_press",
                 "t_offset_s": 0.3,
                 "confidence_ceiling": 0.9,
@@ -280,7 +284,7 @@ def test_observations_fixture_reaches_the_judge(tmp_path):
 
     with Log(logdb) as log:
         evals = log.since(EPOCH, ["alarm_eval"])
-    assert any("keepout_entry:zone_press" in e.open_episodes for e in evals)
+    assert any("stalled:zone_press" in e.open_episodes for e in evals)
 
 
 def test_observations_help_labels_it_fixture_input():

@@ -2,7 +2,9 @@
 {"station_id": "station-1", "frame_id": 1, "t_offset_s": 0.0, "kind": "part_present", "target": "rail_pos_1", "method": "fixture", "confidence_ceiling": 0.95, "detector_output": {"score": 0.95}}
 {"station_id": "station-1", "frame_id": 1, "t_offset_s": 0.0, "kind": "part_present", "target": "rail_pos_2", "method": "fixture", "confidence_ceiling": 0.94, "detector_output": {"score": 0.94}}
 {"station_id": "station-1", "frame_id": 1, "t_offset_s": 0.0, "kind": "motion", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.8, "detector_output": {"magnitude": 0.4}}
+{"station_id": "station-1", "frame_id": 1, "t_offset_s": 0.0, "kind": "zone_clear", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.92, "detector_output": {"overlap": 0.0}}
 {"station_id": "station-1", "frame_id": 30, "t_offset_s": 15.0, "kind": "no_motion", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.8, "detector_output": {"magnitude": 0.01}}
+{"station_id": "station-1", "frame_id": 30, "t_offset_s": 15.0, "kind": "zone_clear", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.92, "detector_output": {"overlap": 0.0}}
 {"station_id": "station-1", "frame_id": 60, "t_offset_s": 30.0, "kind": "part_present", "target": "rail_pos_1", "method": "fixture", "confidence_ceiling": 0.96, "detector_output": {"score": 0.96}}
 {"station_id": "station-1", "frame_id": 60, "t_offset_s": 30.0, "kind": "part_present", "target": "rail_pos_2", "method": "fixture", "confidence_ceiling": 0.93, "detector_output": {"score": 0.93}}
 {"station_id": "station-1", "frame_id": 60, "t_offset_s": 30.0, "kind": "motion", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.82, "detector_output": {"magnitude": 0.45}}

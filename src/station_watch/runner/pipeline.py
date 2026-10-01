@@ -66,6 +66,7 @@ class Runner:
         self._source = context.source
         self._log = context.log
         self._thresholds = context.thresholds
+        self._keepout_backend = context.keepout_backend
         self._run_id = run_id
         self._stages = resolve_stages(stop_stage)
         self._stop_stage_after = stop_stage_after
@@ -76,7 +77,11 @@ class Runner:
         self._stop = threading.Event()
         self._capture_error: BaseException | None = None
         self._capture_exit_reported = False
-        self._judge = Judge(self._config, run_id=run_id, clock=clock)
+        self._stall_window_s = context.stall_window_s
+        self._stall_window_source = context.stall_window_source
+        self._judge = Judge(
+            self._config, run_id=run_id, clock=clock, stall_window_s=context.stall_window_s
+        )
         self._alarm = Alarm(self._config, run_id=run_id, sinks=context.sinks, clock=clock)
 
     def stop(self) -> None:
@@ -85,6 +90,10 @@ class Runner:
 
     def run(self) -> None:
         """Start Capture, drive the cycle loop, and shut both down cleanly."""
+        print(
+            f"stall threshold {self._stall_window_s:.1f} s ({self._stall_window_source})",
+            flush=True,
+        )
         run_start_ts = self._clock()
         observations = self._load_observations(run_start_ts)
         capture = Capture(
@@ -94,7 +103,7 @@ class Runner:
             run_id=self._run_id,
             speed=self._speed,
             clock=self._clock,
-            detector=build_detector(self._config, self._run_id),
+            detector=build_detector(self._config, self._run_id, self._keepout_backend),
         )
         thread = threading.Thread(
             target=self._capture_main,

@@ -14,46 +14,69 @@ returns ``None`` when the config names no Detect targets, so a camera-health-onl
 station runs exactly as it did before Detect.
 
 HF2.3 composes a rail-position tracker (:class:`PositionTracker`) whenever the
-config lists rail positions; station-zone and keep-out trackers join the same
-fan-out when HF2.6 lands, and :func:`detect_targets_configured` grows with them.
+config lists rail positions; HF2.4 adds a station-zone motion tracker
+(:class:`MotionTracker`) whenever the zone opts into motion; HF2.6 adds a keep-out
+tracker (:class:`KeepoutTracker`) whenever the config lists keep-out zones. Each
+makes :func:`detect_targets_configured` true, so a station with any of them builds
+a Detector and refuses ``--observations`` (one source of observations per run).
 """
 
 from __future__ import annotations
 
 from station_watch.detect.geometry import find_marker_corners
+from station_watch.detect.keepout import KeepoutTracker
+from station_watch.detect.motion import MotionTracker
 from station_watch.detect.positions import PositionTracker
 from station_watch.records import Observation
 
 CAUSE_DETECT_ERROR = "detect_error"
 
 
+def _motion_configured(config) -> bool:
+    """True when the ``station_zone`` opts into frame-to-frame motion (HF2.4)."""
+    return bool(config.detect["station_zone"].get("track_motion"))
+
+
 def detect_targets_configured(config) -> bool:
-    """True when the detect config names targets Detect reads (HF2.3: rail positions).
+    """True when the detect config names targets Detect reads.
 
     This gates both whether the runner builds a :class:`Detector` and whether
     ``--observations`` conflicts with Detect -- one source of observations per run.
-    Station-zone and keep-out trackers (HF2.6) extend this predicate.
+    Rail positions (HF2.3), station-zone motion (HF2.4) and keep-out zones (HF2.6)
+    each count.
     """
-    return bool(config.detect["rail_positions"])
+    return (
+        bool(config.detect["rail_positions"])
+        or _motion_configured(config)
+        or bool(config.keepout_zones)
+    )
 
 
-def build_detector(config, run_id: str) -> Detector | None:
-    """A :class:`Detector` for this config, or ``None`` when it names no targets."""
+def build_detector(config, run_id: str, keepout_backend=None) -> Detector | None:
+    """A :class:`Detector` for this config, or ``None`` when it names no targets.
+
+    ``keepout_backend`` supplies the person detector for keep-out zones; the runner
+    builds and hash-verifies it at startup (K9) and passes it in here.
+    """
     if not detect_targets_configured(config):
         return None
-    return Detector(config, run_id)
+    return Detector(config, run_id, keepout_backend=keepout_backend)
 
 
 class Detector:
     """Find the fiducial once per frame and fan the corners out to every tracker."""
 
-    def __init__(self, config, run_id: str) -> None:
+    def __init__(self, config, run_id: str, keepout_backend=None) -> None:
         self._config = config
         self._run_id = run_id
         self._fiducial = config.fiducial
         self._trackers: list = []
         if config.detect["rail_positions"]:
             self.add_tracker(PositionTracker(config, run_id))
+        if _motion_configured(config):
+            self.add_tracker(MotionTracker(config, run_id))
+        if config.keepout_zones:
+            self.add_tracker(KeepoutTracker(config, run_id, keepout_backend))
 
     def add_tracker(self, tracker) -> None:
         """Compose one more tracker into the per-frame fan-out."""

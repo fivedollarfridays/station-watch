@@ -49,6 +49,14 @@ The example config watches the camera's own health: frames arriving, not dark, n
 
 Detect runs automatically when the config lists rail positions or zones under `detect`: Capture reads those targets from the same frames and appends the observations to the Log for the Judge, so a missing or unseated part becomes a fault. The example config lists none, so it stays camera-health only. `--observations` is fixture input for drills and is refused alongside a `detect` config with targets — one source of observations per run.
 
+Keep-out zones need a person detector. Station Watch uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX)-Nano (Apache-2.0) in ONNX form, run locally through OpenCV's `cv2.dnn` — no extra Python package. The weights are never committed; fetch them once into `data/local/models/` (gitignored), which verifies the SHA-256:
+
+```bash
+station-watch fetch-model
+```
+
+This is the only command that touches the network — `run` never does. A config with `keepout_zones` set but the weights missing or failing the hash refuses to start, naming the file (K9). A box overlapping an active zone for `detect.keepout.persistence_frames` frames raises a `keepout_entry` fault; an inactive zone never faults, and a zone the detector cannot read (marker missing, model error) reads `zone_unknown`, which keeps the station unobservable rather than healthy.
+
 Start the Watchdog in a second terminal, on its own clock and its own alarm rail (K7, K8), so a stalled or dead run is caught even though it shares the Log:
 
 ```bash

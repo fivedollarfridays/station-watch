@@ -17,13 +17,13 @@ The three outcomes are ranked (README K1: unobservable never folds into healthy)
   required slot whose latest reading is ``part_absent`` is ``missing_part``; a
   person in an active keep-out zone is ``keepout_entry``.
 * **healthy** requires positive confirmation -- every required slot read
-  ``part_present``. A ``part_unknown`` slot is neither present nor absent (README
-  point 2), so it raises no ``missing_part`` fault yet cannot read healthy either;
-  with nothing else wrong the station is unobservable, not healthy.
+  ``part_present`` *and* every configured keep-out zone read ``zone_clear`` (K1). A
+  ``part_unknown`` slot or a ``zone_unknown`` zone is neither safe nor a positive
+  fault, and a zone with no reading at all is not clear, so with nothing else wrong
+  the station is unobservable, not healthy.
 
-Keep-out zones are treated as active for the single running HF1 station, so a
-person in a configured zone is a fault; the "while active" gate is where a future
-schedule would attach.
+A person in a configured keep-out zone is a ``keepout_entry`` fault; an inactive
+zone reads ``zone_clear`` (Detect ignores its person boxes), so it never faults.
 """
 
 from __future__ import annotations
@@ -43,6 +43,9 @@ from station_watch.records import (
 _PART_KINDS = frozenset(
     {ObservationKind.PART_PRESENT, ObservationKind.PART_ABSENT, ObservationKind.PART_UNKNOWN}
 )
+_KEEPOUT_KINDS = frozenset(
+    {ObservationKind.PERSON_IN_KEEPOUT, ObservationKind.ZONE_CLEAR, ObservationKind.ZONE_UNKNOWN}
+)
 _ALL_KINDS = frozenset(ObservationKind)
 
 
@@ -53,11 +56,19 @@ def _order_key(obs: Observation) -> tuple[str, int]:
 class Judge:
     """Renders a :class:`Verdict` from the current Log state and appends it."""
 
-    def __init__(self, config, *, run_id: str, clock=utc_now_iso) -> None:
+    def __init__(
+        self, config, *, run_id: str, clock=utc_now_iso, stall_window_s: float | None = None
+    ) -> None:
         self._config = config
         self._run_id = run_id
         self._clock = clock
         self._seq = 0
+        # The stall window's source is resolved at startup (measured step times vs
+        # configured takt, see :mod:`station_watch.steps`); default here keeps the
+        # Judge usable standalone (tests, no runner) on ``takt_s + grace_s``.
+        self._stall_window = (
+            stall_window_s if stall_window_s is not None else config.takt_s + config.grace_s
+        )
         self._inputs = JudgeInputs(camera_id=config.camera_id, run_id=run_id)
 
     def judge(self, log, now_ts: str | None = None, *, stream_ended: bool = False) -> Verdict:
@@ -91,7 +102,7 @@ class Judge:
         faults = self._faults(by_target, now)
         if faults:
             return self._build(VerdictState.FAULT, tuple(faults), (), now)
-        if self._all_required_slots_present(by_target):
+        if self._all_required_slots_present(by_target) and self._all_keepout_zones_clear(by_target):
             return self._build(VerdictState.HEALTHY, (), (), now)
         return self._build(VerdictState.UNOBSERVABLE, (), (), now)
 
@@ -115,7 +126,7 @@ class Judge:
         ]
 
     def _stall_faults(self, by_target, now: str) -> list[Fault]:
-        window = self._config.takt_s + self._config.grace_s
+        window = self._stall_window
         faults = []
         for target, observations in by_target.items():
             motion = self._latest(observations, {ObservationKind.MOTION})
@@ -141,7 +152,7 @@ class Judge:
         faults = []
         for zone in self._config.keepout_zones:
             observations = by_target.get(zone, [])
-            latest = self._latest(observations, _ALL_KINDS)
+            latest = self._latest(observations, _KEEPOUT_KINDS)
             if latest is None or latest.kind != ObservationKind.PERSON_IN_KEEPOUT:
                 continue
             frame_ids = self._trailing_frames(observations, ObservationKind.PERSON_IN_KEEPOUT)
@@ -152,6 +163,19 @@ class Judge:
         for slot in self._config.required_slots:
             latest = self._latest(by_target.get(slot, []), _PART_KINDS)
             if latest is None or latest.kind != ObservationKind.PART_PRESENT:
+                return False
+        return True
+
+    def _all_keepout_zones_clear(self, by_target) -> bool:
+        """K1: a configured keep-out zone is clear only on a latest ``zone_clear``.
+
+        A ``zone_unknown`` reading, or none at all, is not clear -- with nothing else
+        wrong the station is unobservable, never healthy (a zone a person could be in
+        is never read as safe without positive confirmation).
+        """
+        for zone in self._config.keepout_zones:
+            latest = self._latest(by_target.get(zone, []), _KEEPOUT_KINDS)
+            if latest is None or latest.kind != ObservationKind.ZONE_CLEAR:
                 return False
         return True
 

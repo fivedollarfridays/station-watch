@@ -10,6 +10,11 @@ part_present / part_absent / part_unknown Observations.
 
 HF2.3 composes those trackers behind :class:`Detector`, which finds the fiducial
 once per frame and fans the corners out, and which Capture and the runner wire in.
+
+HF2.6 adds keep-out: :class:`KeepoutTracker` reads person boxes from a backend --
+the default :class:`~station_watch.detect.yolox.YoloxBackend` (YOLOX-Nano,
+Apache-2.0, run locally via ``cv2.dnn``) -- and persists per-zone readings into
+``person_in_keepout`` / ``zone_clear`` / ``zone_unknown`` Observations.
 """
 
 from station_watch.detect.detector import (
@@ -19,7 +24,10 @@ from station_watch.detect.detector import (
     detect_targets_configured,
 )
 from station_watch.detect.geometry import find_marker_corners, region_to_pixels
+from station_watch.detect.keepout import KeepoutTracker
+from station_watch.detect.motion import MotionTracker
 from station_watch.detect.positions import PositionReading, PositionTracker, read_positions
+from station_watch.detect.yolox import YoloxBackend, fetch_model, verify_weights
 
 __all__ = [
     "find_marker_corners",
@@ -27,6 +35,11 @@ __all__ = [
     "PositionReading",
     "PositionTracker",
     "read_positions",
+    "MotionTracker",
+    "KeepoutTracker",
+    "YoloxBackend",
+    "fetch_model",
+    "verify_weights",
     "Detector",
     "build_detector",
     "detect_targets_configured",

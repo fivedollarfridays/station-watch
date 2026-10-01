@@ -1,6 +1,7 @@
 # Scenario: the line stalls -- parts stay present but there is no motion for longer than takt_s + grace_s, so no cycle completes. Expected Judge verdict: fault (stalled) on zone_press.
 {"station_id": "station-1", "frame_id": 1, "t_offset_s": 0.0, "kind": "part_present", "target": "rail_pos_1", "method": "fixture", "confidence_ceiling": 0.95, "detector_output": {"score": 0.95}}
 {"station_id": "station-1", "frame_id": 1, "t_offset_s": 0.0, "kind": "motion", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.8, "detector_output": {"magnitude": 0.4}}
+{"station_id": "station-1", "frame_id": 1, "t_offset_s": 0.0, "kind": "zone_clear", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.92, "detector_output": {"overlap": 0.0}}
 {"station_id": "station-1", "frame_id": 30, "t_offset_s": 15.0, "kind": "no_motion", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.85, "detector_output": {"magnitude": 0.005}}
 {"station_id": "station-1", "frame_id": 60, "t_offset_s": 30.0, "kind": "no_motion", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.86, "detector_output": {"magnitude": 0.004}}
 {"station_id": "station-1", "frame_id": 90, "t_offset_s": 45.0, "kind": "no_motion", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.87, "detector_output": {"magnitude": 0.003}}
