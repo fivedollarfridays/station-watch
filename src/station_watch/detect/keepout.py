@@ -20,7 +20,7 @@ Persistence mirrors :class:`~station_watch.detect.positions.PositionTracker`:
   a zone a person could be standing in is never folded into ``zone_clear``.
 
 An **inactive** zone is always read clear: its person boxes are ignored, so it never
-emits ``person_in_keepout`` and never faults. The tracker follows the HF2.3 tracker
+emits ``person_in_keepout`` and never faults. The tracker follows the Detector's tracker
 protocol -- ``update(frame, frame_id, ts, corners)`` (the Detector finds the marker
 once and passes the corners in) and ``unknown_all(frame_id, ts, cause, detail)``.
 """

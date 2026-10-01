@@ -41,7 +41,8 @@ def _add_run_parser(sub) -> None:
     run.add_argument(
         "--observations",
         help="FIXTURE INPUT: a JSONL of observations, rebased onto this run's start and "
-        "fed to the Judge like any other input as each ts arrives (Detect replaces this in HF2)",
+        "fed to the Judge like any other input as each ts arrives (refused when the "
+        "config lists Detect targets)",
     )
     run.add_argument(
         "--stop-stage",

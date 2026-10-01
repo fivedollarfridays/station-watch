@@ -29,7 +29,6 @@ again.
 
 from __future__ import annotations
 
-import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -39,15 +38,21 @@ import numpy as np
 from station_watch.capture.blind import BlindThresholds, BlindWatch
 from station_watch.capture.fiducial import find_marker_center
 from station_watch.capture.metrics import fingerprint, mean_luma, noise_score
+from station_watch.capture.resilience import (
+    DetectStep,
+    error_detail,
+    liveness_loop,
+    reopen_source,
+    report,
+)
 from station_watch.capture.source import FrameSource
 from station_watch.clock import utc_now_iso
-from station_watch.detect.detector import CAUSE_DETECT_ERROR, Detector
+from station_watch.detect.detector import Detector
 from station_watch.records import FrameRecord
 
 _MONO_EPSILON = 1e-9
 _BACKOFF_START_S = 0.05
 _BACKOFF_MAX_S = 1.0
-_ERROR_MESSAGE_MAX = 200
 
 
 class Capture:
@@ -78,8 +83,7 @@ class Capture:
         self._clock = clock
         self._monotonic = monotonic
         self._sleep = sleep
-        self._detector = detector
-        self._detect_error_reported = False
+        self._detect = DetectStep(detector) if detector is not None else None
         self._stopped = False
         self._stop_event = threading.Event()
         self.first_frame = threading.Event()
@@ -160,8 +164,8 @@ class Capture:
         watch.start(start)
         stop_event = threading.Event()
         timer = threading.Thread(
-            target=self._liveness_loop,
-            args=(watch, stop_event, thresholds.liveness_window_s, poll_interval),
+            target=liveness_loop,
+            args=(watch, stop_event, thresholds.liveness_window_s, poll_interval, self._monotonic),
             daemon=True,
         )
         timer.start()
@@ -210,48 +214,20 @@ class Capture:
         self.first_frame.set()
         center = find_marker_center(frame, fiducial["dictionary_id"], fiducial["marker_id"])
         watch.observe_frame(record, center)
-        if self._detector is not None:
+        if self._detect is not None:
             self._detect(log, frame, record.frame_id, record.ts)
-
-    def _detect(self, log, frame: np.ndarray, frame_id: int, ts: str) -> None:
-        """Run Detect on this frame and append its rows (same serialized Log writer).
-
-        A Detect exception must not kill Capture and must not look like a
-        disconnected camera: every target reads ``part_unknown`` with cause
-        ``detect_error`` and the error text, reported once on stderr per episode
-        (a later clean read ends the episode).
-        """
-        try:
-            observations = self._detector.process(frame, frame_id, ts)
-            self._detect_error_reported = False
-        except Exception as exc:  # a Detect fault is unknown, never a false disconnect
-            detail = f"{type(exc).__name__}: {str(exc)[:_ERROR_MESSAGE_MAX]}"
-            if not self._detect_error_reported:
-                self._detect_error_reported = True
-                print(
-                    f"station-watch: detect frame {frame_id} failed: {detail}",
-                    file=sys.stderr,
-                    flush=True,
-                )
-            observations = self._detector.unknown_all(frame_id, ts, CAUSE_DETECT_ERROR, detail)
-        for observation in observations:
-            log.append(observation)
 
     def _frame_failed(self, watch: BlindWatch, exc: Exception, frame_id: int) -> None:
         """Record a per-frame processing error as ``disconnected``; report it once."""
         self._prev = None
-        detail = f"{type(exc).__name__}: {str(exc)[:_ERROR_MESSAGE_MAX]}"
+        detail = error_detail(exc)
         try:
             opened = watch.read_failed({"error": detail})
         except Exception as record_exc:  # the Log itself may be what is failing
             detail = f"{detail} (and could not record it: {record_exc!r})"
             opened = True
         if opened:
-            print(
-                f"station-watch: capture frame {frame_id} processing failed: {detail}",
-                file=sys.stderr,
-                flush=True,
-            )
+            report(f"capture frame {frame_id} processing failed: {detail}")
 
     def _read(self) -> tuple[np.ndarray | None, Exception | None]:
         """One read; K10: a read that raises is unobservable, never a crash."""
@@ -267,23 +243,5 @@ class Capture:
         self._prev = None
         self._stop_event.wait(backoff)
         if not self._source.is_file and not self._stopped:
-            self._reopen()
+            reopen_source(self._source)
         return min(backoff * 2.0, _BACKOFF_MAX_S)
-
-    def _reopen(self) -> None:
-        reopen = getattr(self._source, "reopen", None)
-        if reopen is None:
-            return
-        try:
-            reopen()
-        except Exception:  # a failed reopen is retried next backoff
-            pass
-
-    def _liveness_loop(
-        self, watch: BlindWatch, stop_event: threading.Event, window_s: float, poll: float | None
-    ) -> None:
-        """Poll liveness on the timer's own clock until the loop stops."""
-        interval = poll if poll is not None else max(window_s / 4.0, 0.01)
-        while not stop_event.is_set():
-            watch.check_liveness(self._monotonic())
-            stop_event.wait(interval)

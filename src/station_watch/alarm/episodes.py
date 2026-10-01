@@ -17,7 +17,7 @@ be delayed or suppressed by a downstream explainer (there is none in HF1). After
 every evaluation it appends an ``alarm_evaluated`` row (ts, open episodes) to the
 Log so the Watchdog can judge the alarm rail's own liveness.
 
-**The part_unknown grace rule (HF2.7).** A *bare* unobservable verdict -- one with
+**The part_unknown grace rule.** A *bare* unobservable verdict -- one with
 no blind reason, i.e. the Judge could not positively confirm a slot or zone (a
 ``part_unknown`` reading, e.g. an operator's hand passing over a filled rail
 position) -- is never folded into healthy (K1: the verdict while unknown is never

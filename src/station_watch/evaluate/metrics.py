@@ -127,7 +127,7 @@ def assemble_metrics(outcomes) -> dict:
 
     Per-session results make a train / test split by recording session visible
     (never by adjacent frames). Metric keys are dotted paths under ``metrics`` --
-    e.g. ``missing_part.precision`` and ``latency.p95_s`` (consumed by HF2.9).
+    e.g. ``missing_part.precision`` and ``latency.p95_s`` (consumed by the README claims test).
     """
     return {
         **_core(outcomes),

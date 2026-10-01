@@ -1,6 +1,6 @@
 """The Detector: find the fiducial once per frame, fan the corners out to trackers.
 
-HF2.3 wires Detect into Capture (:mod:`station_watch.capture.capture`) and the
+Detect is wired into Capture (:mod:`station_watch.capture.capture`) and the
 runner. ``Detector`` composes the per-target trackers that share one protocol --
 ``update(frame, frame_id, ts, corners) -> list[Observation]`` and
 ``unknown_all(frame_id, ts, cause, detail) -> list[Observation]`` -- so the marker
@@ -13,9 +13,9 @@ turns a Detect exception into a ``part_unknown`` reading for every target (cause
 returns ``None`` when the config names no Detect targets, so a camera-health-only
 station runs exactly as it did before Detect.
 
-HF2.3 composes a rail-position tracker (:class:`PositionTracker`) whenever the
-config lists rail positions; HF2.4 adds a station-zone motion tracker
-(:class:`MotionTracker`) whenever the zone opts into motion; HF2.6 adds a keep-out
+The Detector composes a rail-position tracker (:class:`PositionTracker`) whenever the
+config lists rail positions, a station-zone motion tracker
+(:class:`MotionTracker`) whenever the zone opts into motion, and a keep-out
 tracker (:class:`KeepoutTracker`) whenever the config lists keep-out zones. Each
 makes :func:`detect_targets_configured` true, so a station with any of them builds
 a Detector and refuses ``--observations`` (one source of observations per run).
@@ -33,7 +33,7 @@ CAUSE_DETECT_ERROR = "detect_error"
 
 
 def _motion_configured(config) -> bool:
-    """True when the ``station_zone`` opts into frame-to-frame motion (HF2.4)."""
+    """True when the ``station_zone`` opts into frame-to-frame motion."""
     return bool(config.detect["station_zone"].get("track_motion"))
 
 
@@ -42,7 +42,7 @@ def detect_targets_configured(config) -> bool:
 
     This gates both whether the runner builds a :class:`Detector` and whether
     ``--observations`` conflicts with Detect -- one source of observations per run.
-    Rail positions (HF2.3), station-zone motion (HF2.4) and keep-out zones (HF2.6)
+    Rail positions, station-zone motion and keep-out zones
     each count.
     """
     return (

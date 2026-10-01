@@ -30,28 +30,15 @@ from __future__ import annotations
 
 from station_watch.clock import parse_iso, utc_now_iso
 from station_watch.judge_inputs import JudgeInputs
-from station_watch.records import (
-    BlindReason,
-    Fault,
-    FaultKind,
-    Observation,
-    ObservationKind,
-    Verdict,
-    VerdictState,
+from station_watch.judge_rules import (
+    all_keepout_zones_clear,
+    all_required_slots_present,
+    keepout_faults,
+    missing_part_faults,
+    stall_faults,
 )
+from station_watch.records import BlindReason, Fault, Verdict, VerdictState
 from station_watch.steps import cycle_time_creep_faults
-
-_PART_KINDS = frozenset(
-    {ObservationKind.PART_PRESENT, ObservationKind.PART_ABSENT, ObservationKind.PART_UNKNOWN}
-)
-_KEEPOUT_KINDS = frozenset(
-    {ObservationKind.PERSON_IN_KEEPOUT, ObservationKind.ZONE_CLEAR, ObservationKind.ZONE_UNKNOWN}
-)
-_ALL_KINDS = frozenset(ObservationKind)
-
-
-def _order_key(obs: Observation) -> tuple[str, int]:
-    return (obs.ts, obs.frame_id)
 
 
 class Judge:
@@ -103,7 +90,10 @@ class Judge:
         faults = self._faults(by_target, now)
         if faults:
             return self._build(VerdictState.FAULT, tuple(faults), (), now)
-        if self._all_required_slots_present(by_target) and self._all_keepout_zones_clear(by_target):
+        config = self._config
+        if all_required_slots_present(by_target, config.required_slots) and all_keepout_zones_clear(
+            by_target, config.keepout_zones
+        ):
             return self._build(VerdictState.HEALTHY, (), (), now)
         return self._build(VerdictState.UNOBSERVABLE, (), (), now)
 
@@ -121,83 +111,11 @@ class Judge:
 
     def _faults(self, by_target, now: str) -> list[Fault]:
         return [
-            *self._stall_faults(by_target, now),
-            *self._missing_part_faults(by_target),
-            *self._keepout_faults(by_target),
+            *stall_faults(by_target, now, self._stall_window),
+            *missing_part_faults(by_target, self._config.required_slots),
+            *keepout_faults(by_target, self._config.keepout_zones),
             *cycle_time_creep_faults(by_target, self._config, self._stall_window),
         ]
-
-    def _stall_faults(self, by_target, now: str) -> list[Fault]:
-        window = self._stall_window
-        faults = []
-        for target, observations in by_target.items():
-            motion = self._latest(observations, {ObservationKind.MOTION})
-            streak = self._no_motion_streak(observations, motion)
-            if not streak:
-                continue
-            reference_ts = motion.ts if motion is not None else streak[0].ts
-            age_s = (parse_iso(now) - parse_iso(reference_ts)).total_seconds()
-            if age_s > window:
-                frame_ids = tuple(sorted(obs.frame_id for obs in streak))
-                faults.append(Fault(FaultKind.STALLED, target, frame_ids))
-        return faults
-
-    def _missing_part_faults(self, by_target) -> list[Fault]:
-        faults = []
-        for slot in self._config.required_slots:
-            latest = self._latest(by_target.get(slot, []), _PART_KINDS)
-            if latest is not None and latest.kind == ObservationKind.PART_ABSENT:
-                faults.append(Fault(FaultKind.MISSING_PART, slot, (latest.frame_id,)))
-        return faults
-
-    def _keepout_faults(self, by_target) -> list[Fault]:
-        faults = []
-        for zone in self._config.keepout_zones:
-            observations = by_target.get(zone, [])
-            latest = self._latest(observations, _KEEPOUT_KINDS)
-            if latest is None or latest.kind != ObservationKind.PERSON_IN_KEEPOUT:
-                continue
-            frame_ids = self._trailing_frames(observations, ObservationKind.PERSON_IN_KEEPOUT)
-            faults.append(Fault(FaultKind.KEEPOUT_ENTRY, zone, frame_ids))
-        return faults
-
-    def _all_required_slots_present(self, by_target) -> bool:
-        for slot in self._config.required_slots:
-            latest = self._latest(by_target.get(slot, []), _PART_KINDS)
-            if latest is None or latest.kind != ObservationKind.PART_PRESENT:
-                return False
-        return True
-
-    def _all_keepout_zones_clear(self, by_target) -> bool:
-        """K1: a configured keep-out zone is clear only on a latest ``zone_clear``.
-
-        A ``zone_unknown`` reading, or none at all, is not clear -- with nothing else
-        wrong the station is unobservable, never healthy (a zone a person could be in
-        is never read as safe without positive confirmation).
-        """
-        for zone in self._config.keepout_zones:
-            latest = self._latest(by_target.get(zone, []), _KEEPOUT_KINDS)
-            if latest is None or latest.kind != ObservationKind.ZONE_CLEAR:
-                return False
-        return True
-
-    def _no_motion_streak(self, observations, motion) -> list[Observation]:
-        no_motion = [obs for obs in observations if obs.kind == ObservationKind.NO_MOTION]
-        if motion is not None:
-            no_motion = [obs for obs in no_motion if _order_key(obs) > _order_key(motion)]
-        return sorted(no_motion, key=_order_key)
-
-    def _trailing_frames(self, observations, kind) -> tuple[int, ...]:
-        trailing = []
-        for obs in sorted(observations, key=_order_key, reverse=True):
-            if obs.kind != kind:
-                break
-            trailing.append(obs.frame_id)
-        return tuple(sorted(trailing))
-
-    def _latest(self, observations, kinds):
-        candidates = [obs for obs in observations if obs.kind in kinds]
-        return max(candidates, key=_order_key) if candidates else None
 
 
 __all__ = ["Judge"]

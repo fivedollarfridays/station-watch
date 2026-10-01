@@ -1,6 +1,6 @@
 """Station-zone motion: frame-to-frame change inside the zone, calibrated to noise.
 
-:class:`MotionTracker` follows the HF2.3 tracker protocol (``update(frame, frame_id,
+:class:`MotionTracker` follows the Detector's tracker protocol (``update(frame, frame_id,
 ts, corners)`` / ``unknown_all(...)``). Each frame it maps the configured
 ``station_zone`` polygon into pixels through the marker and compares the zone to the
 previous *readable* frame: a pixel counts as changed when its gray-level difference

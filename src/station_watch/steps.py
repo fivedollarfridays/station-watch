@@ -1,4 +1,4 @@
-"""Measured step times: the stall window's source, and the file HF2.8 writes.
+"""Measured step times: the stall window's source, and the file the evaluation harness writes.
 
 A *step* is one unit of work in the station zone: a contiguous run of ``motion``
 observations, closed (bounded) by the ``no_motion`` that ends it. Its duration is
@@ -10,7 +10,7 @@ which is what a cycle takes when the line is running.
 * :func:`step_stats` reduces their durations to ``count`` / ``p50_s`` / ``p95_s``.
 * :func:`write_step_times` / :func:`read_step_times` round-trip the committed
   ``step_times.json`` -- ``{"provenance": {...}, "metrics": {count, p50_s, p95_s}}``
-  -- which HF2.8's evaluation harness produces and HF2.4 reads.
+  -- which the evaluation harness produces and startup reads.
 * :func:`resolve_stall_window` turns a config into the Judge's stall window plus a
   human source string: the measured ``p95 + grace_s`` when ``detect.step_times_path``
   points at a real file, else ``takt_s + grace_s``. A configured path that does not
@@ -98,7 +98,7 @@ def step_stats(durations) -> dict:
 
 
 def write_step_times(path: str | Path, stats: dict, provenance: dict) -> None:
-    """Write the committed ``step_times.json`` (HF2.8's producer of the file)."""
+    """Write the committed ``step_times.json`` (the evaluation harness's producer of the file)."""
     payload = {
         "provenance": dict(provenance),
         "metrics": {

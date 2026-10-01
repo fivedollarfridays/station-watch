@@ -4,7 +4,7 @@
 every clip a :mod:`~station_watch.evaluate.manifest` lists through the real
 Capture -> Detect -> Judge -> Alarm path and writes committed JSON measurement
 files -- precision/recall per flag type and per rail-position state, the confusion
-matrix, capture-to-verdict latency, time to alarm, the HF2.4 ``step_times.json``,
+matrix, capture-to-verdict latency, time to alarm, the measured ``step_times.json``,
 and the same numbers for the naive frame-difference baseline -- each stamped with
 full provenance (dataset, manifest/config SHA-256, git commit, detector, date).
 

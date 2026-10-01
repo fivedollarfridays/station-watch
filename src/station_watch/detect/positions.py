@@ -12,7 +12,7 @@ after ``persistence_frames`` consecutive visible frames read *occupied and seate
 streak, so a covered part can never be folded into ``part_present``. It emits on
 every confirmed-state change and re-emits the current state every ``emit_interval_s``.
 
-The tracker protocol consumed by HF2.3's ``Detector`` is ``update(frame, frame_id,
+The tracker protocol consumed by the ``Detector`` is ``update(frame, frame_id,
 ts, corners)`` -- the ``Detector`` finds the marker once and passes the corners in
 -- and ``unknown_all(frame_id, ts, cause, detail)`` for whole-frame failures.
 """

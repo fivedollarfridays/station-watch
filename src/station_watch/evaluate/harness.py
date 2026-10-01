@@ -5,7 +5,7 @@ first (no labeled set, or a manifest naming a missing clip, writes nothing and
 exits non-zero with a distinct code), then drives each clip through the real
 pipeline, scores it against ground truth, computes the same numbers for the naive
 baseline, and writes the measurement files -- ``detect.json``, ``baseline.json``
-and the HF2.4 ``step_times.json`` -- each stamped with provenance. ``--synthetic``
+and the measured ``step_times.json`` -- each stamped with provenance. ``--synthetic``
 takes the same path over a set generated at run time and tagged
 ``dataset_kind: synthetic``.
 """
