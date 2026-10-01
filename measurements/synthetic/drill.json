@@ -5,82 +5,82 @@
         "alarm": "unobservable:view_shifted",
         "alarm_count": 1,
         "blind_reason": "view_shifted",
-        "cleared_ts": "2026-10-01T09:37:57.227730+00:00",
+        "cleared_ts": "2026-10-01T12:51:32.045450+00:00",
         "exactly_one_alarm": true,
         "exactly_one_recovery": true,
         "expected_reason": [
           "view_shifted",
           "fiducial_missing"
         ],
-        "injected_ts": "2026-10-01T09:37:56.227730+00:00",
+        "injected_ts": "2026-10-01T12:51:31.045450+00:00",
         "reason_matches": true,
         "recovery_count": 1,
-        "time_to_alarm_s": 0.27341,
-        "time_to_recovery_s": 0.250675
+        "time_to_alarm_s": 0.2,
+        "time_to_recovery_s": 0.15
       },
       "cable_pulled": {
         "alarm": "unobservable:disconnected",
         "alarm_count": 1,
         "blind_reason": "disconnected",
-        "cleared_ts": "2026-10-01T09:37:59.427730+00:00",
+        "cleared_ts": "2026-10-01T12:51:34.245450+00:00",
         "exactly_one_alarm": true,
         "exactly_one_recovery": true,
         "expected_reason": [
           "disconnected"
         ],
-        "injected_ts": "2026-10-01T09:37:58.427730+00:00",
+        "injected_ts": "2026-10-01T12:51:33.245450+00:00",
         "reason_matches": true,
         "recovery_count": 1,
-        "time_to_alarm_s": 0.05808,
-        "time_to_recovery_s": 0.835117
+        "time_to_alarm_s": 0.037701,
+        "time_to_recovery_s": 0.85
       },
       "frozen": {
         "alarm": "unobservable:frozen",
         "alarm_count": 1,
         "blind_reason": "frozen",
-        "cleared_ts": "2026-10-01T09:37:55.027730+00:00",
+        "cleared_ts": "2026-10-01T12:51:29.845450+00:00",
         "exactly_one_alarm": true,
         "exactly_one_recovery": true,
         "expected_reason": [
           "frozen"
         ],
-        "injected_ts": "2026-10-01T09:37:54.027730+00:00",
+        "injected_ts": "2026-10-01T12:51:28.845450+00:00",
         "reason_matches": true,
         "recovery_count": 1,
-        "time_to_alarm_s": 0.101405,
-        "time_to_recovery_s": 0.109183
+        "time_to_alarm_s": 0.15,
+        "time_to_recovery_s": 0.15
       },
       "lens_covered": {
         "alarm": "unobservable:dark",
         "alarm_count": 1,
         "blind_reason": "dark",
-        "cleared_ts": "2026-10-01T09:37:52.827730+00:00",
+        "cleared_ts": "2026-10-01T12:51:27.645450+00:00",
         "exactly_one_alarm": true,
         "exactly_one_recovery": true,
         "expected_reason": [
           "dark"
         ],
-        "injected_ts": "2026-10-01T09:37:51.827730+00:00",
+        "injected_ts": "2026-10-01T12:51:26.645450+00:00",
         "reason_matches": true,
         "recovery_count": 1,
-        "time_to_alarm_s": 0.465113,
-        "time_to_recovery_s": 0.273703
+        "time_to_alarm_s": 0.3,
+        "time_to_recovery_s": 0.2
       },
       "lights_off": {
         "alarm": "unobservable:dark",
         "alarm_count": 1,
         "blind_reason": "dark",
-        "cleared_ts": "2026-10-01T09:38:01.627730+00:00",
+        "cleared_ts": "2026-10-01T12:51:36.445450+00:00",
         "exactly_one_alarm": true,
         "exactly_one_recovery": true,
         "expected_reason": [
           "dark"
         ],
-        "injected_ts": "2026-10-01T09:38:00.627730+00:00",
+        "injected_ts": "2026-10-01T12:51:35.445450+00:00",
         "reason_matches": true,
         "recovery_count": 1,
-        "time_to_alarm_s": 0.487606,
-        "time_to_recovery_s": 0.299944
+        "time_to_alarm_s": 0.3,
+        "time_to_recovery_s": 0.15
       }
     },
     "thresholds": {
@@ -102,8 +102,8 @@
     "dataset_kind": "synthetic",
     "date_utc": "2026-10-01",
     "detector": "station_watch.detect:real-pipeline:v1",
-    "git_commit": "ce4682ee1576d92578590352138a6558ce992b60",
-    "manifest_sha256": "f72b5534c5f1f5d38cb90b3e9080a57212b869a562534559a935f90b8c3f3a35",
+    "git_commit": "c382d7e8b78148830d4eb93757475e0903af255e",
+    "manifest_sha256": "b7af3be67fceec8bd5b9755ea363b202e69463644f97a13f7e3cde59adca2002",
     "sessions": []
   }
 }

@@ -1,6 +1,7 @@
 # SYNTHETIC fault drill schedule: all five camera faults, in sequence, with healthy
 # gaps between them so each fault opens exactly one alarm episode and recovers before
-# the next. Offsets are seconds from the run's start on the wall clock.
+# the next. Offsets are simulated seconds from frame 0 on the drill's frame clock
+# (frame k at k / fps), so a stall on a loaded machine cannot squeeze a window.
 faults:
 - {fault: lens_covered, start_s: 1.0, clear_s: 2.0}
 - {fault: frozen, start_s: 3.2, clear_s: 4.2}
