@@ -63,6 +63,34 @@ Start the Watchdog in a second terminal, on its own clock and its own alarm rail
 station-watch watchdog --config config/station-example.yaml --log station.db
 ```
 
+Run a fault drill to measure time-to-alarm against the real `run` pipeline. Synthetic mode injects camera faults into rendered frames on a schedule and writes a measurement file plus a markdown time-to-alarm table beside it:
+
+```bash
+station-watch drill --config config/station-example.yaml --log drill.db --out drill.json --schedule schedule.yaml
+```
+
+Live mode runs a real camera while you inject faults physically and type `start`/`clear <fault>` on stdin:
+
+```bash
+station-watch drill --config config/station-example.yaml --log drill.db --out drill.json --live --source 0
+```
+
+Measure a physics script (for example the fps sweep) over the labeled clip set. With no `--clips`, an absent manifest, or no clips tagged for the script, `measure` writes a `no_input` file — status `no_input`, no metrics key — and exits zero, so a physics table that does not exist yet says so in the repo rather than inventing numbers; real results write the measurement format under `measurements/v1/`:
+
+```bash
+station-watch measure fps_sweep --clips clips.yaml --config config/station-example.yaml
+```
+
+Open the read-only operator Board, built from the Log. It never writes, and a missing or stale Log reads as UNKNOWN rather than OK. Serve the auto-refreshing screen on loopback, or print the plain-text view once and exit:
+
+```bash
+station-watch board --config config/station-example.yaml --log station.db
+```
+
+```bash
+station-watch board --config config/station-example.yaml --log station.db --once
+```
+
 ## Design principles
 
 These are ideas carried over from patterns run in production, rewritten fresh for a plant floor. No code is imported.
