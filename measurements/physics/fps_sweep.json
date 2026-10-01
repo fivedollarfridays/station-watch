@@ -1,0 +1,9 @@
+{
+  "command": "station-watch measure fps_sweep",
+  "provenance": {
+    "date_utc": "2026-10-01",
+    "git_commit": "2eb1ae68f551a34467a139999a126c102f747f51"
+  },
+  "reason": "no --clips given",
+  "status": "no_input"
+}

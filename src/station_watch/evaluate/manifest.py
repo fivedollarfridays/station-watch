@@ -63,7 +63,13 @@ class ManifestError(RuntimeError):
 
 @dataclass(frozen=True)
 class ClipLabel:
-    """Ground truth for one clip: its session, resolved path, and labeled intervals."""
+    """Ground truth for one clip: its session, resolved path, and labeled intervals.
+
+    ``tags`` is an optional per-clip mapping of capture conditions (for example
+    ``fps``, ``exposure_s``, ``speed_m_s``, ``lamp``, ``angle_deg``). It is how a
+    physics measurement selects the clips it consumes without touching the HF2
+    scoring intervals; an HF2 manifest with no ``tags`` loads exactly as before.
+    """
 
     session: str
     rel_path: str
@@ -73,6 +79,7 @@ class ClipLabel:
     keepouts: list[dict] = field(default_factory=list)
     camera_faults: list[dict] = field(default_factory=list)
     creeps: list[dict] = field(default_factory=list)
+    tags: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -129,6 +136,7 @@ def _clip_label(session: str, entry: dict, clips_dir: Path) -> ClipLabel:
         keepouts=list(entry.get("keepouts", [])),
         camera_faults=list(entry.get("camera_faults", [])),
         creeps=list(entry.get("creeps", [])),
+        tags=dict(entry.get("tags", {})),
     )
 
 
