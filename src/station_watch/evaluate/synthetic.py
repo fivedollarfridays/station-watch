@@ -38,26 +38,9 @@ from station_watch.evaluate.synthetic_specs import (
 _FPS = 20.0
 
 
-def _load_renderer():
-    """Locate the repo's ``synth_station`` renderer (a dev/proving-only helper).
-
-    ``--synthetic`` is a proving tool run from the repository: the renderer lives
-    under ``tests/helpers`` (one source of truth, shared with the e2e tests), so we
-    put that directory on the path the same way the e2e tests do rather than
-    duplicating ~200 lines of rendering into the shipped package.
-    """
-    import sys
-
-    tests_dir = Path(__file__).resolve().parents[3] / "tests"
-    if str(tests_dir) not in sys.path:
-        sys.path.insert(0, str(tests_dir))
-    from helpers.synth_station import write_synth_station_clip
-
-    return write_synth_station_clip
-
-
 def _render(spec, clips_dir: Path) -> str:
-    write_synth_station_clip = _load_renderer()
+    from station_watch.synth.station import write_synth_station_clip
+
     out_dir = clips_dir / spec["session"] / spec["name"]
     path, _truth = write_synth_station_clip(
         out_dir,
