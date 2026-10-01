@@ -17,7 +17,15 @@ from station_watch.alarm.sink import AlarmError, Sink, build_sinks
 from station_watch.capture.blind import BlindThresholds
 from station_watch.capture.source import CaptureError, FrameSource
 from station_watch.config import StationConfig, load_station_config
+from station_watch.detect.detector import detect_targets_configured
+from station_watch.detect.yolox import (
+    WeightsError,
+    YoloxBackend,
+    default_model_path,
+    verify_weights,
+)
 from station_watch.log import Log, LogError
+from station_watch.steps import StepTimesError, resolve_stall_window
 
 
 class StartupError(RuntimeError):
@@ -33,6 +41,9 @@ class RunContext:
     log: Log
     sinks: list[Sink]
     thresholds: BlindThresholds
+    keepout_backend: object | None = None
+    stall_window_s: float = 0.0
+    stall_window_source: str = ""
 
 
 def parse_source(spec: str) -> int | str:
@@ -68,6 +79,37 @@ def open_log(path: str) -> Log:
         raise StartupError(f"could not open log {path}: {exc}") from exc
 
 
+def build_keepout_backend(config: StationConfig):
+    """The keep-out person detector when zones are configured, or ``None``.
+
+    Loading verifies the weights file exists and matches the expected SHA-256; a
+    missing or mismatched file raises :class:`StartupError` naming it (K9), so a
+    station configured to watch a keep-out zone never starts half-blind to it.
+    """
+    if not config.keepout_zones:
+        return None
+    keepout = config.detect.get("keepout", {})
+    model_path = keepout.get("model_path", str(default_model_path()))
+    try:
+        verify_weights(model_path)
+    except WeightsError as exc:
+        raise StartupError(str(exc)) from exc
+    return YoloxBackend(model_path, score_threshold=keepout.get("score_threshold", 0.3))
+
+
+def resolve_stall_window_or_fail(config: StationConfig) -> tuple[float, str]:
+    """The Judge's stall window and its source, or a loud failure naming the file (K9).
+
+    ``detect.step_times_path`` that points at a real measurement file gives
+    ``p95 + grace_s``; absent, the window is ``takt_s + grace_s``; a configured path
+    that does not exist (or will not parse) refuses to start.
+    """
+    try:
+        return resolve_stall_window(config)
+    except StepTimesError as exc:
+        raise StartupError(str(exc)) from exc
+
+
 def open_source(spec: str) -> FrameSource:
     """Open the capture source or fail loud, naming the source that would not open."""
     try:
@@ -77,10 +119,22 @@ def open_source(spec: str) -> FrameSource:
 
 
 def build_context(
-    *, config_path: str, source_spec: str, log_path: str, alarm_record: str | None
+    *,
+    config_path: str,
+    source_spec: str,
+    log_path: str,
+    alarm_record: str | None,
+    observations_path: str | None = None,
 ) -> RunContext:
     """Validate and open everything the runner needs; raise StartupError on any gap."""
     config = load_config(config_path)
+    if observations_path is not None and detect_targets_configured(config):
+        raise StartupError(
+            "--observations (fixture input) and a detect config with targets both supply "
+            "observations; use one source per run (drop --observations or the detect targets)"
+        )
+    keepout_backend = build_keepout_backend(config)
+    stall_window_s, stall_window_source = resolve_stall_window_or_fail(config)
     sinks = build_alarm_sinks(config, record_path=alarm_record)
     log = open_log(log_path)
     try:
@@ -94,6 +148,9 @@ def build_context(
         log=log,
         sinks=sinks,
         thresholds=BlindThresholds.from_station_config(config),
+        keepout_backend=keepout_backend,
+        stall_window_s=stall_window_s,
+        stall_window_source=stall_window_source,
     )
 
 

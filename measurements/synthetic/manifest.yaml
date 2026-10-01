@@ -1,0 +1,74 @@
+dataset: synthetic-proving
+sessions:
+- clips:
+  - path: s1/normal/clip.mkv
+    positions:
+    - end_frame: 47
+      start_frame: 0
+      state: present
+      target: rail_pos_1
+    - end_frame: 47
+      start_frame: 0
+      state: present
+      target: rail_pos_2
+  - path: s1/missing/clip.mkv
+    positions:
+    - end_frame: 47
+      start_frame: 0
+      state: absent
+      target: rail_pos_1
+    - end_frame: 47
+      start_frame: 0
+      state: present
+      target: rail_pos_2
+  - camera_faults:
+    - reason: fiducial_missing
+      start_frame: 16
+    path: s1/blind/clip.mkv
+    positions:
+    - end_frame: 15
+      start_frame: 0
+      state: present
+      target: rail_pos_1
+    - end_frame: 15
+      start_frame: 0
+      state: present
+      target: rail_pos_2
+    - end_frame: 47
+      start_frame: 16
+      state: unknown
+      target: rail_pos_1
+    - end_frame: 47
+      start_frame: 16
+      state: unknown
+      target: rail_pos_2
+  id: s1
+- clips:
+  - path: s2/stall/clip.mkv
+    positions:
+    - end_frame: 101
+      start_frame: 0
+      state: present
+      target: rail_pos_1
+    - end_frame: 101
+      start_frame: 0
+      state: present
+      target: rail_pos_2
+    stalls:
+    - end_frame: 101
+      start_frame: 42
+  - keepouts:
+    - end_frame: 31
+      start_frame: 14
+      zone: zone_press
+    path: s2/keepout/clip.mkv
+    positions:
+    - end_frame: 31
+      start_frame: 0
+      state: present
+      target: rail_pos_1
+    - end_frame: 31
+      start_frame: 0
+      state: present
+      target: rail_pos_2
+  id: s2

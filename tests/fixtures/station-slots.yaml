@@ -9,10 +9,10 @@ camera_id: cam-0
 takt_s: 30.0
 grace_s: 5.0
 
-# Slots that must hold a part, and zones a person must not enter.
+# Rail positions that must hold a component, and zones a person must not enter.
 required_slots:
-  - slot_a
-  - slot_b
+  - rail_pos_1
+  - rail_pos_2
 keepout_zones:
   - zone_press
 
@@ -48,3 +48,24 @@ watchdog:
   sinks:
     - screen
     - sound
+
+# Detect (HF2): rail positions and zones as marker-unit quadrilaterals (each
+# point [u, v] relative to the fiducial's center and axes, 1.0 == one marker
+# side). Every required_slots id has a rail_positions entry and every
+# keepout_zones id a keepout_rois entry.
+detect:
+  persistence_frames: 3
+  emit_interval_s: 5.0
+  rail_positions:
+    rail_pos_1: [[-3, -0.5], [-1, -0.5], [-1, 0.5], [-3, 0.5]]
+    rail_pos_2: [[1, -0.5], [3, -0.5], [3, 0.5], [1, 0.5]]
+  station_zone:
+    id: bench
+    region: [[-5, -3], [5, -3], [5, 3], [-5, 3]]
+  keepout_rois:
+    zone_press:
+      region: [[2, -3], [5, -3], [5, -1], [2, -1]]
+      active: true
+  blur_threshold: 100.0
+  darkness_threshold: 40.0
+  occlusion_threshold: 0.5

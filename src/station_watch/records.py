@@ -37,6 +37,8 @@ class ObservationKind(StrEnum):
     PART_ABSENT = "part_absent"
     PART_UNKNOWN = "part_unknown"
     PERSON_IN_KEEPOUT = "person_in_keepout"
+    ZONE_CLEAR = "zone_clear"
+    ZONE_UNKNOWN = "zone_unknown"
     MOTION = "motion"
     NO_MOTION = "no_motion"
 
@@ -51,6 +53,7 @@ class FaultKind(StrEnum):
     STALLED = "stalled"
     MISSING_PART = "missing_part"
     KEEPOUT_ENTRY = "keepout_entry"
+    CYCLE_TIME_CREEP = "cycle_time_creep"
 
 
 @dataclass(frozen=True)

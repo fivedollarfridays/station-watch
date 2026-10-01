@@ -1,5 +1,6 @@
 # Scenario: a person enters the keep-out zone while the press area is active. Expected Judge verdict: fault (keepout_entry) on zone_press.
-{"station_id": "station-1", "frame_id": 1, "t_offset_s": 0.0, "kind": "part_present", "target": "slot_a", "method": "fixture", "confidence_ceiling": 0.95, "detector_output": {"score": 0.95}}
+{"station_id": "station-1", "frame_id": 1, "t_offset_s": 0.0, "kind": "part_present", "target": "rail_pos_1", "method": "fixture", "confidence_ceiling": 0.95, "detector_output": {"score": 0.95}}
 {"station_id": "station-1", "frame_id": 1, "t_offset_s": 0.0, "kind": "motion", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.8, "detector_output": {"magnitude": 0.4}}
+{"station_id": "station-1", "frame_id": 1, "t_offset_s": 0.0, "kind": "zone_clear", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.92, "detector_output": {"overlap": 0.0}}
 {"station_id": "station-1", "frame_id": 45, "t_offset_s": 22.5, "kind": "person_in_keepout", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.97, "detector_output": {"bbox": [610, 320, 60, 120]}}
 {"station_id": "station-1", "frame_id": 60, "t_offset_s": 30.0, "kind": "person_in_keepout", "target": "zone_press", "method": "fixture", "confidence_ceiling": 0.96, "detector_output": {"bbox": [615, 322, 58, 118]}}

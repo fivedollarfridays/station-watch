@@ -58,6 +58,9 @@ def _record_alarm(config, path):
 
 
 def _events(path):
+    # A run that opens no episode never creates the record file: no events.
+    if not Path(path).exists():
+        return []
     return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
 
 
@@ -144,7 +147,7 @@ def test_pulled_cable_alarms_once_and_recovers_once(tmp_path):
     "fixture,offset,cause",
     [
         ("stall.jsonl", 45.0, "stalled:zone_press"),
-        ("missing_part.jsonl", 30.0, "missing_part:slot_a"),
+        ("missing_part.jsonl", 30.0, "missing_part:rail_pos_1"),
         ("keepout_entry.jsonl", 30.0, "keepout_entry:zone_press"),
     ],
 )
@@ -199,7 +202,7 @@ def test_alarm_evaluated_row_after_each_evaluation(tmp_path):
     assert len(rows) == 3
     assert [r.seq for r in rows] == [1, 2, 3]
     # By 30s the missing part has opened an episode, named in open_episodes.
-    assert rows[-1].open_episodes == ("missing_part:slot_a",)
+    assert rows[-1].open_episodes == ("missing_part:rail_pos_1",)
 
 
 # --- sinks and tone ----------------------------------------------------------
@@ -278,7 +281,7 @@ def test_unobservable_without_a_named_reason_still_alarms(tmp_path):
             frame_id=90,
             ts=_at(45.0),
             kind=ObservationKind.PART_UNKNOWN,
-            target="slot_a",
+            target="rail_pos_1",
             method="fixture",
             confidence_ceiling=0.3,
             detector_output={},
@@ -292,3 +295,107 @@ def test_unobservable_without_a_named_reason_still_alarms(tmp_path):
     alarms = [e for e in _events(record_path) if e["event"] == "alarm"]
     assert len(alarms) == 1
     assert alarms[0]["cause"] == "unobservable:unknown"
+
+
+# --- HF2.7: part_unknown grace -- a brief hand pass waits out detect.unknown_grace_s ---
+
+UNKNOWN_CAUSE = "unobservable:unknown"
+
+
+def _grace_config(grace_s, **over):
+    base = load_station_config(CONFIG)
+    return replace(base, detect={**base.detect, "unknown_grace_s": grace_s}, **over)
+
+
+def _part(config, kind, frame_id, offset, target="rail_pos_1"):
+    from station_watch.records import Observation
+
+    return Observation(
+        station_id=config.station_id,
+        frame_id=frame_id,
+        ts=_at(offset),
+        kind=kind,
+        target=target,
+        method="rail_positions:color_fill+edge_density:v1",
+        confidence_ceiling=0.3 if kind.value == "part_unknown" else 0.95,
+        detector_output={},
+        run_id=RUN,
+    )
+
+
+def test_brief_part_unknown_opens_no_episode_and_is_never_healthy(tmp_path):
+    # A hand passes over a filled rail position for 1.5 s with a 3 s grace: the
+    # station is never healthy while covered, but no alarm episode opens (K1 holds
+    # -- unobservable, not healthy -- without crying wolf over a momentary cover).
+    from station_watch.records import ObservationKind, VerdictState
+
+    config = _grace_config(3.0)
+    log = Log(tmp_path / "brief.db")
+    _load(log, "normal_cycles.jsonl")  # both slots present, zone clear
+    log.append(_part(config, ObservationKind.PART_UNKNOWN, 80, 40.0))  # hand covers at 40.0 s
+    log.append(_part(config, ObservationKind.PART_PRESENT, 84, 41.5))  # leaves at 41.5 s (<grace)
+    record_path = tmp_path / "alarm.jsonl"
+    judge = LiveCameraJudge(config, RUN)
+    alarm = _record_alarm(config, record_path)
+
+    covered = []
+    for offset in (40.0, 40.5, 41.0):
+        verdict = judge.judge(log, _at(offset))
+        covered.append(verdict.state)
+        alarm.evaluate(verdict, log)
+    for offset in (41.5, 42.0, 42.5, 43.0):
+        alarm.evaluate(judge.judge(log, _at(offset)), log)
+
+    assert all(state == VerdictState.UNOBSERVABLE for state in covered), covered
+    assert [e for e in _events(record_path) if e["event"] == "alarm"] == []
+
+
+def test_long_part_unknown_opens_one_episode_and_recovers_once(tmp_path):
+    # The same cover held past the 2 s grace opens exactly one unknown episode and,
+    # once the hand leaves and the slot reads present again, recovers exactly once.
+    from station_watch.records import ObservationKind
+
+    config = _grace_config(2.0)
+    log = Log(tmp_path / "long.db")
+    _load(log, "normal_cycles.jsonl")
+    log.append(_part(config, ObservationKind.PART_UNKNOWN, 80, 40.0))  # covers at 40.0 s, stays
+    log.append(_part(config, ObservationKind.PART_PRESENT, 120, 46.0))  # leaves at 46.0 s (>grace)
+    record_path = tmp_path / "alarm.jsonl"
+    judge = LiveCameraJudge(config, RUN)
+    alarm = _record_alarm(config, record_path)
+
+    for offset in (40.0, 41.0, 42.0, 43.0, 44.0, 45.0, 46.0, 47.0, 48.0, 49.0):
+        alarm.evaluate(judge.judge(log, _at(offset)), log)
+
+    events = _events(record_path)
+    alarms = [e for e in events if e["event"] == "alarm"]
+    recoveries = [e for e in events if e["event"] == "recovery"]
+    assert [a["cause"] for a in alarms] == [UNKNOWN_CAUSE]
+    assert [r["cause"] for r in recoveries] == [UNKNOWN_CAUSE]
+
+
+def test_blind_reason_opens_at_once_despite_a_large_unknown_grace(tmp_path):
+    # A blind camera (a frozen/dark/disconnected reason) is NOT a bare part_unknown:
+    # it opens its episode on the first evaluation, never waiting out unknown_grace_s.
+    from dataclasses import replace as dc_replace
+
+    from station_watch.records import BlindReason, Verdict, VerdictState
+
+    config = _grace_config(10_000.0)
+    log = Log(tmp_path / "blind.db")
+    record_path = tmp_path / "alarm.jsonl"
+    alarm = _record_alarm(config, record_path)
+    frozen = Verdict(
+        station_id=config.station_id,
+        ts=_at(5.0),
+        state=VerdictState.UNOBSERVABLE,
+        faults=(),
+        blind_reasons=(BlindReason.FROZEN,),
+        seq=1,
+        run_id=RUN,
+    )
+    alarm.evaluate(frozen, log)
+    alarm.evaluate(dc_replace(frozen, ts=_at(5.1), seq=2), log)
+
+    alarms = [e for e in _events(record_path) if e["event"] == "alarm"]
+    assert [a["cause"] for a in alarms] == ["unobservable:frozen"]

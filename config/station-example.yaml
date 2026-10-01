@@ -57,3 +57,40 @@ watchdog:
   sinks:
     - screen
     - sound
+
+# Detect (HF2): where to read bench state, and how stable a reading must be.
+#
+# Rail positions and zones are quadrilaterals in MARKER UNITS: each point is
+# [u, v] relative to the fiducial marker's center, with u along the marker's
+# x-axis (top edge) and v along its y-axis (left edge), where 1.0 == one marker
+# side. Anchoring to the marker (not fixed pixels) means a region lands on the
+# same real-world spot even if the camera is bumped or re-zoomed.
+#
+# Every id in required_slots must have a rail_positions entry and every id in
+# keepout_zones a keepout_rois entry, or loading fails naming the dotted key
+# (e.g. detect.rail_positions.rail_pos_2). required_slots/keepout_zones are empty
+# in the shipped example, so these maps are empty too; fill them in together.
+detect:
+  persistence_frames: 3          # consecutive agreeing visible frames before emitting a state
+  emit_interval_s: 5.0           # re-emit each target's current state at least this often
+  rail_positions: {}             # id -> region (quad of 4 [u, v] marker-unit points)
+  station_zone:
+    id: bench                    # the whole working area, for motion / stall
+    region: [[-4, -3], [4, -3], [4, 3], [-4, 3]]
+    # track_motion: true         # opt in to frame-to-frame motion / no_motion on this zone
+    # motion_area_frac: 0.005    # zone fraction that must change to read motion (above noise)
+  keepout_rois: {}               # id -> {region: quad, active: true|false}
+  # step_times_path:             # optional: a measured step_times.json (written by
+  #   measurements/.../step_times.json  # `station-watch evaluate`); the Judge's stall window
+  #                              # becomes its p95 + grace_s. A path that does not exist fails
+  #                              # loud at startup. Absent -> the window is takt_s + grace_s.
+  blur_threshold: 100.0          # variance-of-Laplacian below this -> too blurred to read
+  darkness_threshold: 40.0       # region mean luma below this -> too dark to read
+  occlusion_threshold: 0.5       # fraction of a position's area covered -> occluded
+  # Keep-out person detection (only used when keepout_zones is non-empty). The model
+  # is YOLOX-Nano (Apache-2.0), fetched with `station-watch fetch-model` and run
+  # locally through cv2.dnn; weights live in data/local/models/ and are never committed.
+  keepout:
+    min_overlap: 0.1             # fraction of a person box inside a zone to count as entry
+    persistence_frames: 3        # consecutive agreeing frames before person_in_keepout/zone_clear
+    # model_path: data/local/models/yolox_nano.onnx   # default; override to relocate the weights

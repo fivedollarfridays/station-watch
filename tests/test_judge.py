@@ -93,7 +93,7 @@ def test_missing_part_faults_on_the_slot_and_cites_its_frame(tmp_path):
     assert verdict.state == VerdictState.FAULT
     assert FaultKind.MISSING_PART in _kinds(verdict)
     fault = _fault(verdict, FaultKind.MISSING_PART)
-    assert fault.target == "slot_a"
+    assert fault.target == "rail_pos_1"
     assert 60 in fault.frame_ids  # part_absent observation lives at frame 60
 
 
@@ -210,14 +210,14 @@ def test_part_unknown_slot_is_neither_healthy_nor_missing_part(tmp_path):
     config = _config()
     log = Log(tmp_path / "unknown.db")
     _load(log, "normal_cycles.jsonl")  # a healthy baseline, both slots present
-    # A later, most-recent reading of slot_a is unknown (occluded / too dark).
+    # A later, most-recent reading of rail_pos_1 is unknown (occluded / too dark).
     log.append(
         Observation(
             station_id=config.station_id,
             frame_id=90,
             ts=_at(45.0),
             kind=ObservationKind.PART_UNKNOWN,
-            target="slot_a",
+            target="rail_pos_1",
             method="fixture",
             confidence_ceiling=0.3,
             detector_output={},

@@ -24,6 +24,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     _add_run_parser(sub)
     _add_watchdog_parser(sub)
+    _add_fetch_model_parser(sub)
+    _add_evaluate_parser(sub)
     return parser
 
 
@@ -39,7 +41,8 @@ def _add_run_parser(sub) -> None:
     run.add_argument(
         "--observations",
         help="FIXTURE INPUT: a JSONL of observations, rebased onto this run's start and "
-        "fed to the Judge like any other input as each ts arrives (Detect replaces this in HF2)",
+        "fed to the Judge like any other input as each ts arrives (refused when the "
+        "config lists Detect targets)",
     )
     run.add_argument(
         "--stop-stage",
@@ -98,6 +101,51 @@ def _add_watchdog_parser(sub) -> None:
     )
 
 
+def _add_fetch_model_parser(sub) -> None:
+    fetch = sub.add_parser(
+        "fetch-model",
+        help="download the keep-out person model (Apache-2.0 YOLOX) and verify its hash",
+        description="Download the YOLOX-Nano ONNX weights (Apache-2.0) from the official "
+        "release into data/local/models/ and verify the SHA-256. This is the only network "
+        "call in the package; `run` never makes it. Weights are never committed.",
+    )
+    fetch.add_argument(
+        "--dest",
+        help="where to write the weights (default: data/local/models/yolox_nano.onnx)",
+    )
+
+
+def _add_evaluate_parser(sub) -> None:
+    from station_watch.evaluate.commandline import add_parser
+
+    add_parser(sub)
+
+
+def _evaluate(args) -> int:
+    from station_watch.evaluate.commandline import handle
+
+    return handle(args)
+
+
+def _fetch_model(args) -> int:
+    from station_watch.detect.fetch import fetch_model
+    from station_watch.detect.yolox import (
+        MODEL_LICENSE,
+        MODEL_NAME,
+        MODEL_SOURCE_URL,
+        WeightsError,
+    )
+
+    print(f"station-watch: fetching {MODEL_NAME} ({MODEL_LICENSE}) from {MODEL_SOURCE_URL}")
+    try:
+        path = fetch_model(args.dest)
+    except (WeightsError, OSError) as exc:
+        print(f"station-watch: fetch-model failed: {exc}", file=sys.stderr)
+        return 1
+    print(f"station-watch: verified weights written to {path}")
+    return 0
+
+
 def _run(args) -> int:
     try:
         context = build_context(
@@ -105,6 +153,7 @@ def _run(args) -> int:
             source_spec=args.source,
             log_path=args.log,
             alarm_record=args.alarm_record,
+            observations_path=args.observations,
         )
     except StartupError as exc:
         print(f"station-watch: {exc}", file=sys.stderr)
@@ -149,6 +198,10 @@ def main(argv: list[str] | None = None) -> int:
         return _run(args)
     if args.command == "watchdog":
         return _watchdog(args)
+    if args.command == "fetch-model":
+        return _fetch_model(args)
+    if args.command == "evaluate":
+        return _evaluate(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 

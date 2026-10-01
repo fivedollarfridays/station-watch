@@ -16,6 +16,20 @@ never any explanation output (K5): the deterministic alarm fires first and canno
 be delayed or suppressed by a downstream explainer (there is none in HF1). After
 every evaluation it appends an ``alarm_evaluated`` row (ts, open episodes) to the
 Log so the Watchdog can judge the alarm rail's own liveness.
+
+**The part_unknown grace rule.** A *bare* unobservable verdict -- one with
+no blind reason, i.e. the Judge could not positively confirm a slot or zone (a
+``part_unknown`` reading, e.g. an operator's hand passing over a filled rail
+position) -- is never folded into healthy (K1: the verdict while unknown is never
+``healthy``), but a short one does not open an alarm episode. The single
+``unobservable:unknown`` episode opens only once that unknown has persisted for at
+least ``detect.unknown_grace_s`` (absent or ``0`` -> opens at once, HF1's
+behaviour), so a momentary cover never cries wolf while a genuine loss of view
+still alarms. The grace governs *only* the bare-unknown cause: a blind-camera
+``unobservable`` (a frozen, dark, disconnected or shifted-view reason) opens its
+episode immediately, with no grace, exactly as in HF1. Any verdict that is not a
+bare unknown -- healthy, a fault, or a blind reason -- resets the grace timer, so
+a later cover waits out a fresh grace window.
 """
 
 from __future__ import annotations
@@ -23,8 +37,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from station_watch.alarm.sink import AlarmError
-from station_watch.clock import utc_now_iso
+from station_watch.clock import parse_iso, utc_now_iso
 from station_watch.records import AlarmEvaluated, VerdictState
+
+_UNKNOWN_CAUSE = "unobservable:unknown"
 
 
 @dataclass(frozen=True)
@@ -72,19 +88,39 @@ class Alarm:
         self._sinks = list(sinks)
         self._clock = clock
         self._recover_after = config.recover_healthy_verdicts
+        self._unknown_grace_s = config.detect.get("unknown_grace_s", 0.0)
+        self._unknown_since: str | None = None
         self._open: dict[str, Episode] = {}
         self._healthy_streak = 0
         self._seq = 0
 
     def evaluate(self, verdict, log) -> AlarmEvaluated:
         """Open episodes for new causes, recover healed ones, log the evaluation."""
+        unknown_ready = self._unknown_grace_elapsed(verdict)
         for episode in self._episodes_for(verdict):
+            if episode.cause == _UNKNOWN_CAUSE and not unknown_ready:
+                continue  # a bare part_unknown still inside its grace window
             if episode.cause not in self._open:
                 self._open[episode.cause] = episode
                 for sink in self._sinks:
                     sink.on_alarm(episode)
         self._advance_recovery(verdict)
         return self._record(verdict.ts, log)
+
+    def _unknown_grace_elapsed(self, verdict) -> bool:
+        """Whether a bare-unknown episode may open now (its grace window has elapsed).
+
+        Only a bare unobservable verdict (unobservable with no blind reason) is
+        graced; anything else resets the timer, so a later cover waits out a fresh
+        window and a blind reason always opens at once.
+        """
+        if not (verdict.state == VerdictState.UNOBSERVABLE and not verdict.blind_reasons):
+            self._unknown_since = None
+            return True
+        if self._unknown_since is None:
+            self._unknown_since = verdict.ts
+        elapsed = (parse_iso(verdict.ts) - parse_iso(self._unknown_since)).total_seconds()
+        return elapsed >= self._unknown_grace_s
 
     def _episodes_for(self, verdict) -> list[Episode]:
         station = verdict.station_id

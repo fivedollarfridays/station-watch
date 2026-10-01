@@ -45,6 +45,16 @@ WATCHDOG_CONFIG = {
     },
     "alarm": {"sinks": ["record"]},
     "watchdog": {"cycle_window_s": 2.0, "alarm_eval_window_s": 2.0, "sinks": ["record"]},
+    "detect": {
+        "persistence_frames": 3,
+        "emit_interval_s": 5.0,
+        "rail_positions": {},
+        "station_zone": {"id": "bench", "region": [[-4, -3], [4, -3], [4, 3], [-4, 3]]},
+        "keepout_rois": {},
+        "blur_threshold": 100.0,
+        "darkness_threshold": 40.0,
+        "occlusion_threshold": 0.5,
+    },
 }
 
 

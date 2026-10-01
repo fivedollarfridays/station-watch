@@ -10,28 +10,21 @@ a missing or moved marker means over a window.
 
 from __future__ import annotations
 
-from functools import cache
-
-import cv2
 import numpy as np
 
-
-@cache
-def _detector(dictionary_id: str) -> cv2.aruco.ArucoDetector:
-    """A cached detector for the named predefined dictionary (e.g. DICT_4X4_50)."""
-    dictionary = cv2.aruco.getPredefinedDictionary(getattr(cv2.aruco, dictionary_id))
-    return cv2.aruco.ArucoDetector(dictionary, cv2.aruco.DetectorParameters())
+from station_watch.detect.geometry import find_marker_corners
 
 
 def find_marker_center(
     frame: np.ndarray, dictionary_id: str, marker_id: int
 ) -> tuple[float, float] | None:
-    """Pixel center ``(x, y)`` of ``marker_id`` in ``frame``, or ``None`` if absent."""
-    corners, ids, _ = _detector(dictionary_id).detectMarkers(frame)
-    if ids is None:
+    """Pixel center ``(x, y)`` of ``marker_id`` in ``frame``, or ``None`` if absent.
+
+    The marker's four corners (and the marker-unit regions mapped through them)
+    live in :mod:`station_watch.detect.geometry`; the center is their centroid.
+    """
+    corners = find_marker_corners(frame, dictionary_id, marker_id)
+    if corners is None:
         return None
-    for marker_corners, found_id in zip(corners, ids.flatten(), strict=False):
-        if int(found_id) == marker_id:
-            center = marker_corners[0].mean(axis=0)
-            return float(center[0]), float(center[1])
-    return None
+    center = corners.mean(axis=0)
+    return float(center[0]), float(center[1])
