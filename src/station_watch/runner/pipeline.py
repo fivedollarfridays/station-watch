@@ -92,6 +92,7 @@ class Runner:
             camera_id=self._config.camera_id,
             run_id=self._run_id,
             speed=self._speed,
+            clock=self._clock,
         )
         thread = threading.Thread(
             target=self._capture_main,

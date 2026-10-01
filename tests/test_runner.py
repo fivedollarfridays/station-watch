@@ -47,6 +47,20 @@ BASE_CONFIG = {
     },
     "alarm": {"sinks": ["record"]},
     "watchdog": {"cycle_window_s": 10.0, "alarm_eval_window_s": 10.0, "sinks": ["record"]},
+    "detect": {
+        "persistence_frames": 3,
+        "emit_interval_s": 5.0,
+        "rail_positions": {},
+        "station_zone": {"id": "bench", "region": [[-4, -3], [4, -3], [4, 3], [-4, 3]]},
+        # A zone_press ROI is pre-declared so the keepout_zones override below
+        # (test_observations_fixture_reaches_the_judge) passes K9 coverage.
+        "keepout_rois": {
+            "zone_press": {"region": [[2, -3], [5, -3], [5, -1], [2, -1]], "active": True}
+        },
+        "blur_threshold": 100.0,
+        "darkness_threshold": 40.0,
+        "occlusion_threshold": 0.5,
+    },
 }
 
 

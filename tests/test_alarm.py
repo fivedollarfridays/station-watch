@@ -144,7 +144,7 @@ def test_pulled_cable_alarms_once_and_recovers_once(tmp_path):
     "fixture,offset,cause",
     [
         ("stall.jsonl", 45.0, "stalled:zone_press"),
-        ("missing_part.jsonl", 30.0, "missing_part:slot_a"),
+        ("missing_part.jsonl", 30.0, "missing_part:rail_pos_1"),
         ("keepout_entry.jsonl", 30.0, "keepout_entry:zone_press"),
     ],
 )
@@ -199,7 +199,7 @@ def test_alarm_evaluated_row_after_each_evaluation(tmp_path):
     assert len(rows) == 3
     assert [r.seq for r in rows] == [1, 2, 3]
     # By 30s the missing part has opened an episode, named in open_episodes.
-    assert rows[-1].open_episodes == ("missing_part:slot_a",)
+    assert rows[-1].open_episodes == ("missing_part:rail_pos_1",)
 
 
 # --- sinks and tone ----------------------------------------------------------
@@ -278,7 +278,7 @@ def test_unobservable_without_a_named_reason_still_alarms(tmp_path):
             frame_id=90,
             ts=_at(45.0),
             kind=ObservationKind.PART_UNKNOWN,
-            target="slot_a",
+            target="rail_pos_1",
             method="fixture",
             confidence_ceiling=0.3,
             detector_output={},

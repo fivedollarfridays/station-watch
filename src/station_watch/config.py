@@ -31,6 +31,7 @@ REQUIRED_KEYS = (
     "fiducial",
     "alarm",
     "watchdog",
+    "detect",
 )
 
 # Required sub-keys of each nested section (``fiducial.window_s`` is optional).
@@ -38,11 +39,32 @@ REQUIRED_NESTED_KEYS = {
     "fiducial": ("dictionary_id", "marker_id", "expected_center_px", "tolerance_px"),
     "alarm": ("sinks",),
     "watchdog": ("cycle_window_s", "alarm_eval_window_s", "sinks"),
+    "detect": (
+        "persistence_frames",
+        "emit_interval_s",
+        "rail_positions",
+        "station_zone",
+        "keepout_rois",
+        "blur_threshold",
+        "darkness_threshold",
+        "occlusion_threshold",
+    ),
 }
 
 
 def _missing(dotted: str) -> KeyError:
     return KeyError(f"missing config key: {dotted}")
+
+
+def _validate_detect_coverage(data: dict[str, Any]) -> None:
+    """Every required slot needs a rail position and every keep-out zone an ROI (K9)."""
+    detect = data["detect"]
+    for slot in data["required_slots"]:
+        if slot not in detect["rail_positions"]:
+            raise _missing(f"detect.rail_positions.{slot}")
+    for zone in data["keepout_zones"]:
+        if zone not in detect["keepout_rois"]:
+            raise _missing(f"detect.keepout_rois.{zone}")
 
 
 def validate_required_keys(data: dict[str, Any]) -> None:
@@ -57,6 +79,7 @@ def validate_required_keys(data: dict[str, Any]) -> None:
         for key in keys:
             if key not in value:
                 raise _missing(f"{section}.{key}")
+    _validate_detect_coverage(data)
 
 
 @dataclass(frozen=True)
@@ -77,6 +100,7 @@ class StationConfig:
     fiducial: dict
     alarm: dict
     watchdog: dict
+    detect: dict
 
     @classmethod
     def from_mapping(cls, data: dict[str, Any]) -> StationConfig:
