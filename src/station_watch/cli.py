@@ -128,12 +128,12 @@ def _evaluate(args) -> int:
 
 
 def _fetch_model(args) -> int:
+    from station_watch.detect.fetch import fetch_model
     from station_watch.detect.yolox import (
         MODEL_LICENSE,
         MODEL_NAME,
         MODEL_SOURCE_URL,
         WeightsError,
-        fetch_model,
     )
 
     print(f"station-watch: fetching {MODEL_NAME} ({MODEL_LICENSE}) from {MODEL_SOURCE_URL}")

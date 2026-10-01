@@ -35,11 +35,14 @@ rail-position detector can confirm (``not_seated`` reads as ``absent``).
   and exits non-zero without writing a file.
 * A manifest that lists a clip whose file is missing raises
   :class:`ManifestError` naming that clip, and again nothing is written.
+* A clip path that is absolute or whose ``..`` climbs out of the clips directory
+  raises :class:`ManifestError`: a manifest never reads a file outside it.
 """
 
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -95,9 +98,26 @@ def sha256_file(path: str | Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def _contained_clip_path(rel: str, clips_dir: Path, session: str) -> Path:
+    """``rel`` under ``clips_dir``, refusing absolute paths and ``..`` that escape it.
+
+    The manifest is untrusted text; a clip path must never reach a file outside the
+    clips directory. Containment is checked on the normalized path (lexically, so an
+    operator's symlinked clip store still works).
+    """
+    base = os.path.abspath(clips_dir)
+    candidate = os.path.abspath(os.path.join(base, str(rel)))
+    if os.path.isabs(str(rel)) or os.path.commonpath([base, candidate]) != base:
+        raise ManifestError(
+            f"manifest clip path escapes the clips directory: {rel!r} "
+            f"(clips dir {clips_dir}, session {session})"
+        )
+    return Path(candidate)
+
+
 def _clip_label(session: str, entry: dict, clips_dir: Path) -> ClipLabel:
     rel = entry["path"]
-    clip_path = clips_dir / rel
+    clip_path = _contained_clip_path(rel, clips_dir, session)
     if not clip_path.exists():
         raise ManifestError(f"manifest clip not found: {clip_path} (session {session})")
     return ClipLabel(

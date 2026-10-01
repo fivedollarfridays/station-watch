@@ -67,6 +67,39 @@ def _validate_detect_coverage(data: dict[str, Any]) -> None:
             raise _missing(f"detect.keepout_rois.{zone}")
 
 
+def _validate_slope(detect: dict[str, Any]) -> None:
+    """``detect.slope`` (optional): well-formed, and only with station-zone motion (K9/K12).
+
+    Cycle-time creep is computed from station-zone ``motion`` / ``no_motion``
+    observations, which Detect emits only when ``detect.station_zone.track_motion``
+    is true -- a slope section without it would be an alarm that can never fire.
+    """
+    if "slope" not in detect:
+        return
+    slope = detect["slope"]
+    if not isinstance(slope, dict):
+        raise ValueError(f"config key detect.slope must be a mapping, got {type(slope).__name__}")
+    for key in ("window_steps", "min_s_per_step"):
+        if key not in slope:
+            raise _missing(f"detect.slope.{key}")
+    window = slope["window_steps"]
+    if isinstance(window, bool) or not isinstance(window, int) or window < 2:
+        raise ValueError(
+            f"config key detect.slope.window_steps must be an int >= 2, got {window!r}"
+        )
+    rate = slope["min_s_per_step"]
+    if isinstance(rate, bool) or not isinstance(rate, (int, float)) or rate <= 0:
+        raise ValueError(
+            f"config key detect.slope.min_s_per_step must be a number > 0, got {rate!r}"
+        )
+    if detect["station_zone"].get("track_motion") is not True:
+        raise ValueError(
+            "config key detect.slope requires detect.station_zone.track_motion: true "
+            "(cycle_time_creep is measured from station-zone motion; without it the alarm "
+            "can never fire)"
+        )
+
+
 def validate_required_keys(data: dict[str, Any]) -> None:
     """Raise ``KeyError`` naming the first missing required key, as a dotted path."""
     for key in REQUIRED_KEYS:
@@ -80,6 +113,7 @@ def validate_required_keys(data: dict[str, Any]) -> None:
             if key not in value:
                 raise _missing(f"{section}.{key}")
     _validate_detect_coverage(data)
+    _validate_slope(data["detect"])
 
 
 @dataclass(frozen=True)

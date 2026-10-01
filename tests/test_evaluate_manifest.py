@@ -92,3 +92,42 @@ def test_valid_manifest_loads_sessions_and_hash(tmp_path):
     assert len(loaded.clips) == 2
     assert loaded.sha256 == sha256_file(manifest)
     assert loaded.clips[0].positions[0]["state"] == "present"
+
+
+def _manifest_naming(tmp_path, rel):
+    manifest = tmp_path / "m.yaml"
+    manifest.write_text(
+        yaml.safe_dump({"dataset": "d", "sessions": [{"id": "s1", "clips": [{"path": rel}]}]})
+    )
+    return manifest
+
+
+@pytest.mark.parametrize("rel", ["../outside.mkv", "s1/../../outside.mkv"])
+def test_clip_path_escaping_clips_dir_is_refused(tmp_path, rel):
+    clips_dir = tmp_path / "clips"
+    _write_clip(clips_dir / "s1/a.mkv")
+    _write_clip(tmp_path / "outside.mkv")  # exists, so only the containment check stops it
+    with pytest.raises(ManifestError, match="escapes the clips directory"):
+        load_manifest(str(_manifest_naming(tmp_path, rel)), clips_dir)
+
+
+def test_absolute_clip_path_is_refused(tmp_path):
+    clips_dir = tmp_path / "clips"
+    outside = tmp_path / "outside.mkv"
+    _write_clip(outside)
+    with pytest.raises(ManifestError, match="escapes the clips directory"):
+        load_manifest(str(_manifest_naming(tmp_path, str(outside))), clips_dir)
+
+
+def test_dotdot_that_stays_inside_clips_dir_is_allowed(tmp_path):
+    clips_dir = tmp_path / "clips"
+    _write_clip(clips_dir / "s1/a.mkv")
+    loaded = load_manifest(str(_manifest_naming(tmp_path, "s2/../s1/a.mkv")), clips_dir)
+    assert loaded.clips[0].clip_path.exists()
+
+
+def test_relative_clips_dir_still_resolves_contained_clips(tmp_path, monkeypatch):
+    _write_clip(tmp_path / "s1/a.mkv")
+    monkeypatch.chdir(tmp_path)
+    loaded = load_manifest(str(_manifest_naming(tmp_path, "s1/a.mkv")), ".")
+    assert loaded.clips[0].clip_path.exists()

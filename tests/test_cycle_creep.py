@@ -37,6 +37,8 @@ N = ObservationKind.NO_MOTION
 def _slope_config(window_steps=5, min_s_per_step=2.0, **over):
     detect = {
         **HEALTH_CONFIG["detect"],
+        # A slope section requires station-zone motion (the creep alarm's only input).
+        "station_zone": {**HEALTH_CONFIG["detect"]["station_zone"], "track_motion": True},
         "slope": {
             "window_steps": window_steps,
             "min_s_per_step": min_s_per_step,

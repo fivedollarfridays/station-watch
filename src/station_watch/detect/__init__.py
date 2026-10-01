@@ -23,11 +23,12 @@ from station_watch.detect.detector import (
     build_detector,
     detect_targets_configured,
 )
+from station_watch.detect.fetch import fetch_model
 from station_watch.detect.geometry import find_marker_corners, region_to_pixels
 from station_watch.detect.keepout import KeepoutTracker
 from station_watch.detect.motion import MotionTracker
 from station_watch.detect.positions import PositionReading, PositionTracker, read_positions
-from station_watch.detect.yolox import YoloxBackend, fetch_model, verify_weights
+from station_watch.detect.yolox import YoloxBackend, verify_weights
 
 __all__ = [
     "find_marker_corners",

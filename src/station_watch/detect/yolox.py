@@ -6,8 +6,9 @@ Source:  https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc
 SHA-256: c789161ed43c8269fcd4e67c67eeeb4e80c622da2eb296a20bc6007bd18a0b7d
 
 The weights are **never committed** (``data/local/models/`` is gitignored). Fetch
-them once with ``station-watch fetch-model``: it downloads the file from the
-official YOLOX release into ``data/local/models/`` and verifies the SHA-256 above.
+them once with ``station-watch fetch-model`` (:mod:`station_watch.detect.fetch`): it
+downloads the file from the official YOLOX release into ``data/local/models/`` --
+bounded by a timeout and a size cap -- and verifies the SHA-256 above.
 That download is the *only* network call in the whole package, and ``run`` never
 makes it -- a run with keep-out zones configured requires the weights to already
 be present and to match the hash, or startup refuses (K9).
@@ -21,7 +22,6 @@ person box, in the frame's own pixel coordinates.
 from __future__ import annotations
 
 import hashlib
-import urllib.request
 from pathlib import Path
 
 import cv2
@@ -77,22 +77,6 @@ def verify_weights(path: str | Path) -> Path:
             f"(expected {MODEL_SHA256}, got {actual}) -- re-run `station-watch fetch-model`"
         )
     return path
-
-
-def fetch_model(dest: str | Path | None = None) -> Path:
-    """Download the official YOLOX weights to ``dest`` and verify the hash.
-
-    This is the only network call in the package. Returns the verified path.
-    """
-    dest = Path(dest) if dest is not None else default_model_path()
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with urllib.request.urlopen(MODEL_SOURCE_URL) as response:  # noqa: S310 (trusted URL)
-        dest.write_bytes(response.read())
-    try:
-        return verify_weights(dest)
-    except WeightsError:
-        dest.unlink(missing_ok=True)
-        raise
 
 
 def _preprocess(frame: np.ndarray) -> tuple[np.ndarray, float]:
@@ -171,7 +155,6 @@ class YoloxBackend:
 __all__ = [
     "YoloxBackend",
     "WeightsError",
-    "fetch_model",
     "verify_weights",
     "sha256_of",
     "default_model_path",
