@@ -4,7 +4,9 @@
 same view as JSON. Every other path is 404 and every non-GET method (including
 ones the stdlib would answer 501, such as PATCH or HEAD) is 405 -- the Board is
 read-only, so there is no method that mutates anything. The server
-binds only to the loopback address, never a routable interface.
+binds only to the loopback address, never a routable interface, and a GET whose
+``Host`` header is not ``127.0.0.1:<port>`` or ``localhost:<port>`` is 403 -- so a
+DNS-rebound page in the operator's browser cannot read the station's state.
 
 Each request rebuilds the view from the Log through a fresh read-only reader, so
 the page always reflects the Log as it is now and the server holds no writable
@@ -39,7 +41,15 @@ class BoardHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def _host_allowed(self) -> bool:
+        port = self.server.server_address[1]
+        host = (self.headers.get("Host") or "").strip().lower()
+        return host in (f"{LOOPBACK}:{port}", f"localhost:{port}")
+
     def do_GET(self) -> None:  # noqa: N802 (stdlib dispatch name)
+        if not self._host_allowed():
+            self._send(403, "text/plain; charset=utf-8", "forbidden host\n")
+            return
         path = self.path.split("?", 1)[0]
         if path in ("/", "/index.html"):
             self._send(200, "text/html; charset=utf-8", render_html(self._view()))

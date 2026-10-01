@@ -4,13 +4,15 @@ Each field comes from the newest row of its kind, judged against the station
 config's own windows:
 
 * **state** -- the newest ``Verdict``'s state and how long it has held (walking
-  back over the contiguous same-state streak). No verdict, or a verdict older
+  back over the contiguous same-state streak, at most ``HELD_WALK_LIMIT`` verdicts;
+  a longer streak reads ``held >= ...``, a true lower bound). No verdict, or a verdict older
   than ``watchdog.cycle_window_s`` (the rate the pipeline writes one), is UNKNOWN
   with the reason -- never OK (K1).
 * **frames** -- now minus the newest ``FrameRecord`` ts, marked STALE beyond
   ``liveness_window_s``.
 * **blind reasons** -- the reasons whose newest ``BlindRecord`` is still
-  ``opened`` (counted separately from faults).
+  ``opened`` (one indexed row per reason, however old; counted separately from
+  faults).
 * **flags** -- the newest verdict's faults, each rendered by its raw kind name
   with its cited frame ids, so a fault kind the Board does not special-case still
   renders and is never dropped.
@@ -25,9 +27,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from station_watch.board.reader import BoardLogError, LogReader
+from station_watch.board.reader import HELD_WALK_LIMIT, BoardLogError, LogReader
 from station_watch.clock import parse_iso
-from station_watch.records import BlindState
+from station_watch.records import BlindReason, BlindState
 
 
 @dataclass(frozen=True)
@@ -80,13 +82,15 @@ def _unknown_view(station_id: str, reason: str) -> StationView:
     )
 
 
-def _held_seconds(reader: LogReader, newest, now: str) -> float:
-    held_since = newest.ts
-    for verdict in reader.iter_newest("verdict"):
+def _held_seconds(reader: LogReader, newest, now: str) -> tuple[float, bool]:
+    """Seconds the newest state has held, and whether the streak outran the walk."""
+    held_since, walked = newest.ts, 0
+    for verdict in reader.iter_newest("verdict", limit=HELD_WALK_LIMIT):
+        walked += 1
         if verdict.state != newest.state:
-            break
+            return _age(held_since, now), False
         held_since = verdict.ts
-    return _age(held_since, now)
+    return _age(held_since, now), walked >= HELD_WALK_LIMIT
 
 
 def _state_fields(reader: LogReader, verdict, config, now: str) -> dict:
@@ -97,10 +101,10 @@ def _state_fields(reader: LogReader, verdict, config, now: str) -> dict:
     if age > window:
         detail = f"verdict STALE ({age:.1f}s old > {window:.1f}s window)"
         return {"state": "UNKNOWN", "detail": detail, "held": None, "stale": True}
-    held = _held_seconds(reader, verdict, now)
+    held, at_least = _held_seconds(reader, verdict, now)
     return {
         "state": verdict.state.value.upper(),
-        "detail": f"held {held:.1f}s",
+        "detail": f"held {'>= ' if at_least else ''}{held:.1f}s",
         "held": held,
         "stale": False,
     }
@@ -118,13 +122,13 @@ def _frame_fields(reader: LogReader, config, now: str) -> dict:
 
 
 def _open_blind_reasons(reader: LogReader) -> tuple[str, ...]:
-    """Reasons whose newest BlindRecord is still ``opened`` (newest-first dedupe)."""
-    seen: dict[str, bool] = {}
-    for record in reader.iter_newest("blind"):
-        reason = record.reason.value
-        if reason not in seen:
-            seen[reason] = record.state == BlindState.OPENED
-    return tuple(reason for reason, is_open in seen.items() if is_open)
+    """Reasons whose newest BlindRecord is still ``opened`` (one row per reason)."""
+    open_reasons = []
+    for reason in BlindReason:
+        record = reader.newest_matching("blind", "reason", reason.value)
+        if record is not None and record.state == BlindState.OPENED:
+            open_reasons.append((record.ts, reason.value))
+    return tuple(reason for _, reason in sorted(open_reasons, reverse=True))
 
 
 def _alarm_fields(reader: LogReader, config, now: str) -> dict:
