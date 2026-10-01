@@ -54,7 +54,12 @@ def test_synthetic_detect_numbers_are_exact(synth):
     m = _metrics(synth / "detect.json")
     # One clip per flag type is a true positive; the rest are true negatives.
     assert m["missing_part"] == {
-        "tp": 1, "fp": 0, "fn": 0, "tn": 4, "precision": 1.0, "recall": 1.0
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "tn": 4,
+        "precision": 1.0,
+        "recall": 1.0,
     }
     assert m["stalled"]["tp"] == 1 and m["stalled"]["fp"] == 0 and m["stalled"]["recall"] == 1.0
     assert m["keepout_entry"]["precision"] == 1.0 and m["keepout_entry"]["recall"] == 1.0
@@ -86,8 +91,15 @@ def test_every_measurement_file_carries_provenance(synth):
     for name in ("detect.json", "baseline.json", "step_times.json"):
         prov = _provenance(synth / name)
         assert set(prov) >= {
-            "dataset", "dataset_kind", "manifest_sha256", "config_sha256", "git_commit",
-            "detector", "clips", "sessions", "date_utc",
+            "dataset",
+            "dataset_kind",
+            "manifest_sha256",
+            "config_sha256",
+            "git_commit",
+            "detector",
+            "clips",
+            "sessions",
+            "date_utc",
         }
         assert prov["dataset_kind"] == "synthetic"
         assert prov["clips"] == 5 and prov["sessions"] == ["s1", "s2"]
@@ -114,7 +126,10 @@ def test_baseline_written_beside_and_beaten_by_the_detector(synth):
 def test_absent_manifest_prints_message_and_writes_nothing(tmp_path, capsys):
     out = tmp_path / "out"
     rc = run_evaluation(
-        config_path=None, manifest_path=None, out_dir=str(out), synthetic=False,
+        config_path=None,
+        manifest_path=None,
+        out_dir=str(out),
+        synthetic=False,
         clips_dir=str(tmp_path),
     )
     assert rc == EXIT_NO_LABELED_SET and rc != 0
@@ -124,8 +139,11 @@ def test_absent_manifest_prints_message_and_writes_nothing(tmp_path, capsys):
 
 def test_missing_manifest_file_is_distinct_nonzero(tmp_path):
     rc = run_evaluation(
-        config_path=None, manifest_path=str(tmp_path / "ghost.yaml"), out_dir=str(tmp_path / "o"),
-        synthetic=False, clips_dir=str(tmp_path),
+        config_path=None,
+        manifest_path=str(tmp_path / "ghost.yaml"),
+        out_dir=str(tmp_path / "o"),
+        synthetic=False,
+        clips_dir=str(tmp_path),
     )
     assert rc == EXIT_NO_LABELED_SET
 
@@ -137,7 +155,10 @@ def test_manifest_naming_a_missing_clip_fails_naming_it_and_writes_nothing(tmp_p
     )
     out = tmp_path / "out"
     rc = run_evaluation(
-        config_path=None, manifest_path=str(manifest), out_dir=str(out), synthetic=False,
+        config_path=None,
+        manifest_path=str(manifest),
+        out_dir=str(out),
+        synthetic=False,
         clips_dir=str(tmp_path / "clips"),
     )
     assert rc == EXIT_MISSING_CLIP and rc not in (0, EXIT_NO_LABELED_SET)
@@ -159,20 +180,37 @@ def _run_cli(*args, timeout=180):
 
 def _run_config(path, step_times_path):
     cfg = {
-        "station_id": "station-1", "camera_id": "cam-0", "takt_s": 30.0, "grace_s": 5.0,
-        "required_slots": list(RAIL), "keepout_zones": [], "liveness_window_s": 2.0,
-        "dark_luma_threshold": 15.0, "dark_window_s": 0.3, "frozen_frames": 10_000,
-        "recover_good_frames": 3, "cycle_interval_s": 0.05, "recover_healthy_verdicts": 2,
+        "station_id": "station-1",
+        "camera_id": "cam-0",
+        "takt_s": 30.0,
+        "grace_s": 5.0,
+        "required_slots": list(RAIL),
+        "keepout_zones": [],
+        "liveness_window_s": 2.0,
+        "dark_luma_threshold": 15.0,
+        "dark_window_s": 0.3,
+        "frozen_frames": 10_000,
+        "recover_good_frames": 3,
+        "cycle_interval_s": 0.05,
+        "recover_healthy_verdicts": 2,
         "fiducial": {
-            "dictionary_id": "DICT_4X4_50", "marker_id": 0, "expected_center_px": [58, 58],
-            "tolerance_px": 10, "window_s": 10_000.0,
+            "dictionary_id": "DICT_4X4_50",
+            "marker_id": 0,
+            "expected_center_px": [58, 58],
+            "tolerance_px": 10,
+            "window_s": 10_000.0,
         },
         "alarm": {"sinks": ["record"]},
         "watchdog": {"cycle_window_s": 1.0, "alarm_eval_window_s": 1.0, "sinks": ["record"]},
         "detect": {
-            "persistence_frames": 2, "emit_interval_s": 5.0, "rail_positions": RAIL,
-            "station_zone": STATION_ZONE, "keepout_rois": {}, "blur_threshold": 100.0,
-            "darkness_threshold": 40.0, "occlusion_threshold": 0.5,
+            "persistence_frames": 2,
+            "emit_interval_s": 5.0,
+            "rail_positions": RAIL,
+            "station_zone": STATION_ZONE,
+            "keepout_rois": {},
+            "blur_threshold": 100.0,
+            "darkness_threshold": 40.0,
+            "occlusion_threshold": 0.5,
             "step_times_path": str(step_times_path),
         },
     }
@@ -191,11 +229,24 @@ def test_evaluate_subprocess_writes_step_times_the_run_subprocess_reads(tmp_path
     clip, _truth = write_synth_station_clip(
         tmp_path / "clip",
         [{"positions": {"rail_pos_1": "present", "rail_pos_2": "present"}} for _ in range(20)],
-        rail_positions=RAIL, station_zone=STATION_ZONE, fps=20.0,
+        rail_positions=RAIL,
+        station_zone=STATION_ZONE,
+        fps=20.0,
     )
     run = _run_cli(
-        "run", "--config", str(config), "--source", str(clip), "--log", str(tmp_path / "log.db"),
-        "--alarm-record", str(tmp_path / "alarm.jsonl"), "--speed", "50", "--max-cycles", "10",
+        "run",
+        "--config",
+        str(config),
+        "--source",
+        str(clip),
+        "--log",
+        str(tmp_path / "log.db"),
+        "--alarm-record",
+        str(tmp_path / "alarm.jsonl"),
+        "--speed",
+        "50",
+        "--max-cycles",
+        "10",
     )
     assert run.returncode == 0, run.stderr
     assert "measured step times" in run.stdout, run.stdout

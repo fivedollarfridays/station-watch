@@ -138,25 +138,52 @@ def _specs() -> list[dict]:
     """
     both = {"target_states": [("rail_pos_1", "present"), ("rail_pos_2", "present")]}
     return [
-        {"session": "s1", "name": "normal",
-         "script": [_f(_BOTH, motion=True) for _ in range(48)], "last": 47, **both, "labels": {}},
-        {"session": "s1", "name": "missing",
-         "script": [_f(_MISS, motion=True) for _ in range(48)], "last": 47,
-         "target_states": [("rail_pos_1", "absent"), ("rail_pos_2", "present")], "labels": {}},
-        {"session": "s1", "name": "blind",
-         "script": [_f(_BOTH, motion=True) for _ in range(16)]
-         + [_f(_BOTH, motion=True, hide=True) for _ in range(32)], "last": 15, **both,
-         "extra_positions": [
-             {"target": t, "state": "unknown", "start_frame": 16, "end_frame": 47}
-             for t in ("rail_pos_1", "rail_pos_2")
-         ],
-         "labels": {"camera_faults": [{"reason": "fiducial_missing", "start_frame": 16}]}},
-        {"session": "s2", "name": "stall", "script": _stall_script(), "last": 101, **both,
-         "labels": {"stalls": [{"start_frame": 42, "end_frame": 101}]}},
-        {"session": "s2", "name": "keepout",
-         "script": [_f(_BOTH, motion=True) for _ in range(32)], "last": 31, **both,
-         "labels": {"keepouts": [{"zone": "zone_press", "start_frame": 14, "end_frame": 31}]},
-         "backend": ("enter", 6)},
+        {
+            "session": "s1",
+            "name": "normal",
+            "script": [_f(_BOTH, motion=True) for _ in range(48)],
+            "last": 47,
+            **both,
+            "labels": {},
+        },
+        {
+            "session": "s1",
+            "name": "missing",
+            "script": [_f(_MISS, motion=True) for _ in range(48)],
+            "last": 47,
+            "target_states": [("rail_pos_1", "absent"), ("rail_pos_2", "present")],
+            "labels": {},
+        },
+        {
+            "session": "s1",
+            "name": "blind",
+            "script": [_f(_BOTH, motion=True) for _ in range(16)]
+            + [_f(_BOTH, motion=True, hide=True) for _ in range(32)],
+            "last": 15,
+            **both,
+            "extra_positions": [
+                {"target": t, "state": "unknown", "start_frame": 16, "end_frame": 47}
+                for t in ("rail_pos_1", "rail_pos_2")
+            ],
+            "labels": {"camera_faults": [{"reason": "fiducial_missing", "start_frame": 16}]},
+        },
+        {
+            "session": "s2",
+            "name": "stall",
+            "script": _stall_script(),
+            "last": 101,
+            **both,
+            "labels": {"stalls": [{"start_frame": 42, "end_frame": 101}]},
+        },
+        {
+            "session": "s2",
+            "name": "keepout",
+            "script": [_f(_BOTH, motion=True) for _ in range(32)],
+            "last": 31,
+            **both,
+            "labels": {"keepouts": [{"zone": "zone_press", "start_frame": 14, "end_frame": 31}]},
+            "backend": ("enter", 6),
+        },
     ]
 
 
@@ -182,8 +209,12 @@ def _render(spec, clips_dir: Path) -> str:
     write_synth_station_clip = _load_renderer()
     out_dir = clips_dir / spec["session"] / spec["name"]
     path, _truth = write_synth_station_clip(
-        out_dir, spec["script"], rail_positions=RAIL, keepout_rois=KEEPOUT,
-        station_zone=STATION_ZONE, fps=_FPS,
+        out_dir,
+        spec["script"],
+        rail_positions=RAIL,
+        keepout_rois=KEEPOUT,
+        station_zone=STATION_ZONE,
+        fps=_FPS,
     )
     return str(Path(path).relative_to(clips_dir))
 

@@ -46,8 +46,12 @@ def _run_clips(config, manifest, work_dir: Path, speed: float, backends):
     outcomes, baselines, steps = [], [], []
     for index, clip in enumerate(manifest.clips):
         run = run_clip(
-            config, clip.clip_path, work_dir / f"clip-{index}",
-            session=clip.session, rel_path=clip.rel_path, speed=speed,
+            config,
+            clip.clip_path,
+            work_dir / f"clip-{index}",
+            session=clip.session,
+            rel_path=clip.rel_path,
+            speed=speed,
             keepout_backend=backends[index],
         )
         outcomes.append(extract_outcome(clip, run))
@@ -63,8 +67,13 @@ def _write_outputs(out_dir, *, dataset, dataset_kind, manifest_sha, config_sha, 
 
     def prov(detector: str) -> dict:
         return build_provenance(
-            dataset=dataset, dataset_kind=dataset_kind, manifest_sha256=manifest_sha,
-            config_sha256=config_sha, detector=detector, clips=len(outcomes), sessions=sessions,
+            dataset=dataset,
+            dataset_kind=dataset_kind,
+            manifest_sha256=manifest_sha,
+            config_sha256=config_sha,
+            detector=detector,
+            clips=len(outcomes),
+            sessions=sessions,
         )
 
     _write_json(out_dir / "detect.json", prov(DETECTOR), assemble_metrics(outcomes))
@@ -78,8 +87,13 @@ def _evaluate(
     with tempfile.TemporaryDirectory() as work:
         bundle = _run_clips(config, manifest, Path(work), speed, backends)
     _write_outputs(
-        out_dir, dataset=manifest.dataset, dataset_kind=dataset_kind, manifest_sha=manifest_sha,
-        config_sha=config_sha, sessions=manifest.sessions, bundle=bundle,
+        out_dir,
+        dataset=manifest.dataset,
+        dataset_kind=dataset_kind,
+        manifest_sha=manifest_sha,
+        config_sha=config_sha,
+        sessions=manifest.sessions,
+        bundle=bundle,
     )
 
 
@@ -97,9 +111,14 @@ def _run_real(config_path, manifest_path, clips_dir, out_dir, speed) -> int:
     config = load_config(config_path)
     backend = build_keepout_backend(config)
     _evaluate(
-        config, manifest, Path(out_dir), dataset_kind="real",
-        manifest_sha=manifest.sha256, config_sha=sha256_file(config_path),
-        speed=speed, backends=[backend] * len(manifest.clips),
+        config,
+        manifest,
+        Path(out_dir),
+        dataset_kind="real",
+        manifest_sha=manifest.sha256,
+        config_sha=sha256_file(config_path),
+        speed=speed,
+        backends=[backend] * len(manifest.clips),
     )
     return 0
 
@@ -114,10 +133,14 @@ def _run_synthetic(out_dir, speed) -> int:
         (out / "config.yaml").write_text(synthetic.config_path.read_text())
         (out / "manifest.yaml").write_text(synthetic.manifest_path.read_text())
         _evaluate(
-            synthetic.config, synthetic.manifest, out, dataset_kind="synthetic",
+            synthetic.config,
+            synthetic.manifest,
+            out,
+            dataset_kind="synthetic",
             manifest_sha=sha256_file(synthetic.manifest_path),
             config_sha=sha256_file(synthetic.config_path),
-            speed=speed, backends=synthetic.backends,
+            speed=speed,
+            backends=synthetic.backends,
         )
     return 0
 

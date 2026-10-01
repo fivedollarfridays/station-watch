@@ -154,10 +154,14 @@ def _run_scenario(tmp_path, clip, config):
     record = tmp_path / "alarm.jsonl"
     result = _run_cli(
         "run",
-        "--config", str(config),
-        "--source", str(clip),
-        "--log", str(tmp_path / "log.db"),
-        "--alarm-record", str(record),
+        "--config",
+        str(config),
+        "--source",
+        str(clip),
+        "--log",
+        str(tmp_path / "log.db"),
+        "--alarm-record",
+        str(record),
     )
     assert result.returncode == 0, result.stderr
     return _verdicts(tmp_path / "log.db"), _alarms(record)
@@ -391,23 +395,35 @@ def test_watchdog_fires_the_alarm_stage_beside_a_detect_enabled_run(tmp_path):
 
     run = _run_popen(
         "run",
-        "--config", str(config),
-        "--source", str(clip),
-        "--log", str(logdb),
-        "--alarm-record", str(tmp_path / "run-alarm.jsonl"),
-        "--stop-stage", "alarm",
-        "--stop-stage-after", "5",
-        "--max-cycles", "120",
+        "--config",
+        str(config),
+        "--source",
+        str(clip),
+        "--log",
+        str(logdb),
+        "--alarm-record",
+        str(tmp_path / "run-alarm.jsonl"),
+        "--stop-stage",
+        "alarm",
+        "--stop-stage-after",
+        "5",
+        "--max-cycles",
+        "120",
     )
     try:
         assert _wait_until_cycles(logdb, 6), "the Detect-enabled run must be writing cycle rows"
         watchdog = _run_cli(
             "watchdog",
-            "--config", str(config),
-            "--log", str(logdb),
-            "--alarm-record", str(wd_record),
-            "--interval", "0.2",
-            "--max-checks", "15",
+            "--config",
+            str(config),
+            "--log",
+            str(logdb),
+            "--alarm-record",
+            str(wd_record),
+            "--interval",
+            "0.2",
+            "--max-checks",
+            "15",
         )
         assert watchdog.returncode == 0, watchdog.stderr
         causes = {a["cause"] for a in _alarms(wd_record)}

@@ -35,10 +35,13 @@ N = ObservationKind.NO_MOTION
 
 
 def _slope_config(window_steps=5, min_s_per_step=2.0, **over):
-    detect = {**HEALTH_CONFIG["detect"], "slope": {
-        "window_steps": window_steps,
-        "min_s_per_step": min_s_per_step,
-    }}
+    detect = {
+        **HEALTH_CONFIG["detect"],
+        "slope": {
+            "window_steps": window_steps,
+            "min_s_per_step": min_s_per_step,
+        },
+    }
     return health_config(detect=detect, **over)
 
 
@@ -135,9 +138,7 @@ def test_steady_steps_with_jitter_raise_no_creep(tmp_path):
     rows = _steady_steps()
     verdicts, _ = _verdicts(config, rows, tmp_path, [_end_offset(rows)])
 
-    assert all(
-        FaultKind.CYCLE_TIME_CREEP not in {f.kind for f in v.faults} for v in verdicts
-    )
+    assert all(FaultKind.CYCLE_TIME_CREEP not in {f.kind for f in v.faults} for v in verdicts)
     assert verdicts[-1].state == VerdictState.HEALTHY
 
 
@@ -147,9 +148,7 @@ def test_fewer_than_window_steps_raise_no_creep(tmp_path):
     rows = _lengthening_steps()[:8]  # 4 steps (2 rows each)
     verdicts, _ = _verdicts(config, rows, tmp_path, [_end_offset(rows)])
 
-    assert all(
-        FaultKind.CYCLE_TIME_CREEP not in {f.kind for f in v.faults} for v in verdicts
-    )
+    assert all(FaultKind.CYCLE_TIME_CREEP not in {f.kind for f in v.faults} for v in verdicts)
 
 
 # --- AC3: the fault cites frames in the clip --------------------------------
@@ -160,9 +159,7 @@ def test_creep_fault_cites_frame_ids_present_in_the_clip(tmp_path):
     rows = _lengthening_steps()
     verdicts, _ = _verdicts(config, rows, tmp_path, [_end_offset(rows)])
 
-    creep = next(
-        f for v in verdicts for f in v.faults if f.kind == FaultKind.CYCLE_TIME_CREEP
-    )
+    creep = next(f for v in verdicts for f in v.faults if f.kind == FaultKind.CYCLE_TIME_CREEP)
     assert creep.target == ZONE
     assert creep.frame_ids  # cites at least one frame
     assert set(creep.frame_ids) <= _frame_ids(rows)  # all cited frames are in the clip

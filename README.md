@@ -85,6 +85,20 @@ These are ideas carried over from patterns run in production, rewritten fresh fo
 
 **Why the Watchdog exists (finding D1).** An audit of an earlier monitoring system found that its own alarm path was not watched by an independent clock: if the alarm stopped while capture and detection kept running, nothing would notice. Here the Watchdog runs on its own clock with its own alarm rail, and its proving test is exactly that case: stop Alarm while Capture and Detect keep running, and the Watchdog must fire within its window.
 
+## Measured performance
+
+**No real measured numbers exist yet.** The labeled clip set **v1** has not been recorded, so `measurements/v1/` does not exist and nothing below is cited from it. Every number in this section is **synthetic** — produced by the evaluation harness (`station-watch evaluate --synthetic`) over the committed synthetic proving set in `measurements/synthetic/`, not from real footage. These prove the measurement path end to end (K13); they do not describe real-world accuracy. When clip set v1 is recorded, `measurements/v1/*.json` lands and its real numbers replace these, each still carrying its claim marker.
+
+Synthetic proving set (`measurements/synthetic/`, dataset_kind `synthetic`), real Detect pipeline — all numbers below are **synthetic**:
+
+| Flag | Precision | Recall |
+|---|---|---|
+| Missing part | <!-- claim: measurements/synthetic/detect.json#metrics.missing_part.precision round=2 -->1.00 | <!-- claim: measurements/synthetic/detect.json#metrics.missing_part.recall round=2 -->1.00 |
+| Stalled | <!-- claim: measurements/synthetic/detect.json#metrics.stalled.precision round=2 -->1.00 | <!-- claim: measurements/synthetic/detect.json#metrics.stalled.recall round=2 -->1.00 |
+| Keep-out entry | <!-- claim: measurements/synthetic/detect.json#metrics.keepout_entry.precision round=2 -->1.00 | <!-- claim: measurements/synthetic/detect.json#metrics.keepout_entry.recall round=2 -->1.00 |
+
+Detection latency over <!-- claim: measurements/synthetic/detect.json#metrics.latency.count -->35 synthetic verdicts has a median of <!-- claim: measurements/synthetic/detect.json#metrics.latency.median_s round=2 -->0.45 s and a p95 of <!-- claim: measurements/synthetic/detect.json#metrics.latency.p95_s round=2 -->0.82 s. The synthetic set is <!-- claim: measurements/synthetic/detect.json#provenance.clips -->5 clips across two sessions.
+
 ## Inspiration
 
 Patterns from [deadman](https://github.com/fivedollarfridays/deadman): catch the failure that reports success, and alarm when the thing being watched goes quiet. Liveness proven by fresh captures, never a bare heartbeat, written after a 24-day silent outage that hid behind a green heartbeat.

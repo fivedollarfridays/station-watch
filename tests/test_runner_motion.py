@@ -200,8 +200,15 @@ def test_startup_line_names_configured_takt_when_no_measured_file(tmp_path):
     config = _write_config(tmp_path / "station.yaml", takt_s=30.0, grace_s=5.0)
     clip = _motion_clip(tmp_path, "clip", [{"motion": True} for _ in range(4)])
     result = _run_cli(
-        "run", "--config", str(config), "--source", str(clip),
-        "--log", str(tmp_path / "log.db"), "--alarm-record", str(tmp_path / "a.jsonl"),
+        "run",
+        "--config",
+        str(config),
+        "--source",
+        str(clip),
+        "--log",
+        str(tmp_path / "log.db"),
+        "--alarm-record",
+        str(tmp_path / "a.jsonl"),
     )
     assert result.returncode == 0, result.stderr
     assert "stall threshold 35.0 s (configured takt; no measured step times)" in result.stdout
@@ -212,15 +219,22 @@ def test_configured_step_times_path_that_does_not_exist_refuses_to_start(tmp_pat
     config = _write_config(tmp_path / "station.yaml", detect={"step_times_path": str(missing)})
     clip = _motion_clip(tmp_path, "clip", [{"motion": True} for _ in range(3)])
     result = _run_cli(
-        "run", "--config", str(config), "--source", str(clip),
-        "--log", str(tmp_path / "log.db"), "--alarm-record", str(tmp_path / "a.jsonl"),
+        "run",
+        "--config",
+        str(config),
+        "--source",
+        str(clip),
+        "--log",
+        str(tmp_path / "log.db"),
+        "--alarm-record",
+        str(tmp_path / "a.jsonl"),
     )
     assert result.returncode != 0
     assert str(missing) in result.stderr
     assert "step_times" in result.stderr
 
 
-def test_e2e_measured_window_from_a_real_run_then_stalls_at_p95_plus_grace(tmp_path):
+def _run_and_measure_step_times(tmp_path):
     # Run 1: a normal clip of motion/still cycles, no step-times file yet.
     cfg1 = _write_config(tmp_path / "station1.yaml", takt_s=30.0, grace_s=0.5)
     normal = []
@@ -229,8 +243,17 @@ def test_e2e_measured_window_from_a_real_run_then_stalls_at_p95_plus_grace(tmp_p
     clip1 = _motion_clip(tmp_path, "normal", normal)
     log1 = tmp_path / "log1.db"
     r1 = _run_cli(
-        "run", "--config", str(cfg1), "--source", str(clip1),
-        "--log", str(log1), "--alarm-record", str(tmp_path / "a1.jsonl"), "--speed", "5",
+        "run",
+        "--config",
+        str(cfg1),
+        "--source",
+        str(clip1),
+        "--log",
+        str(log1),
+        "--alarm-record",
+        str(tmp_path / "a1.jsonl"),
+        "--speed",
+        "5",
     )
     assert r1.returncode == 0, r1.stderr
     assert "configured takt; no measured step times" in r1.stdout
@@ -242,19 +265,31 @@ def test_e2e_measured_window_from_a_real_run_then_stalls_at_p95_plus_grace(tmp_p
     stats = step_stats(steps)
     step_times = tmp_path / "step_times.json"
     write_step_times(step_times, stats, {"dataset": "synthetic", "detector": "station_zone_motion"})
-    p95 = read_step_times(step_times)["p95_s"]
-    window = p95 + 0.5
+    return step_times, read_step_times(step_times)["p95_s"] + 0.5
+
+
+def test_e2e_measured_window_from_a_real_run_then_stalls_at_p95_plus_grace(tmp_path):
+    step_times, window = _run_and_measure_step_times(tmp_path)
 
     # Run 2: the same station, now pointing at the measured file, over a long still clip.
     cfg2 = _write_config(
-        tmp_path / "station2.yaml", takt_s=30.0, grace_s=0.5,
+        tmp_path / "station2.yaml",
+        takt_s=30.0,
+        grace_s=0.5,
         detect={"step_times_path": str(step_times)},
     )
     still = _motion_clip(tmp_path, "still", [{} for _ in range(50)], fps=20.0)
     log2 = tmp_path / "log2.db"
     r2 = _run_cli(
-        "run", "--config", str(cfg2), "--source", str(still),
-        "--log", str(log2), "--alarm-record", str(tmp_path / "a2.jsonl"),
+        "run",
+        "--config",
+        str(cfg2),
+        "--source",
+        str(still),
+        "--log",
+        str(log2),
+        "--alarm-record",
+        str(tmp_path / "a2.jsonl"),
     )
     assert r2.returncode == 0, r2.stderr
     assert "measured step times" in r2.stdout, r2.stdout
