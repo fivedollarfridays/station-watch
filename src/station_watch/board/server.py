@@ -1,8 +1,9 @@
 """The Board's HTTP face: a stdlib ``http.server`` bound to 127.0.0.1.
 
 ``GET /`` serves the auto-refreshing HTML page; ``GET /view.json`` serves the
-same view as JSON. Every other path is 404 and every non-GET method is 405 --
-the Board is read-only, so there is no method that mutates anything. The server
+same view as JSON. Every other path is 404 and every non-GET method (including
+ones the stdlib would answer 501, such as PATCH or HEAD) is 405 -- the Board is
+read-only, so there is no method that mutates anything. The server
 binds only to the loopback address, never a routable interface.
 
 Each request rebuilds the view from the Log through a fresh read-only reader, so
@@ -53,14 +54,12 @@ class BoardHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    def do_POST(self) -> None:  # noqa: N802
-        self._reject()
-
-    def do_PUT(self) -> None:  # noqa: N802
-        self._reject()
-
-    def do_DELETE(self) -> None:  # noqa: N802
-        self._reject()
+    def __getattr__(self, name: str):
+        # The stdlib dispatches method X to ``do_X`` and answers 501 when it is
+        # missing; route every method other than GET to 405 instead.
+        if name.startswith("do_"):
+            return self._reject
+        raise AttributeError(name)
 
     def log_message(self, *args) -> None:  # keep the Board quiet on stderr
         pass

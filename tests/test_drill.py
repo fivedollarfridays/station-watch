@@ -241,10 +241,13 @@ def _board_once(config, log):
 
 
 def _wait_board_shows_open(config, log, deadline_s=25.0):
+    # Wait for the alarm episode itself, not just the blind reason: the BlindRecord
+    # opens a cycle before AlarmEvaluated lists the episode, and a snapshot taken in
+    # that gap legitimately shows "blind: dark" with "open episodes: none".
     start = time.monotonic()
     while time.monotonic() - start < deadline_s:
         result = _board_once(config, log)
-        if result.returncode == 0 and "dark" in result.stdout and "NOT OK" in result.stdout:
+        if result.returncode == 0 and "unobservable:dark" in result.stdout:
             return result.stdout
         time.sleep(0.1)
     return None

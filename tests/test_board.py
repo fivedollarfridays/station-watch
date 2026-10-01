@@ -308,6 +308,19 @@ def test_http_server_binds_loopback_serves_get_and_rejects_non_get(tmp_path):
             assert caught.value.code == 405, method
 
 
+def test_every_non_get_method_is_405_not_501(tmp_path):
+    # The stdlib answers a method with no do_* handler with 501; the Board's contract
+    # is that *every* non-GET method is 405 with Allow: GET.
+    log_path = _proving_log(tmp_path / "log.db")
+    with _ServerThread(health_config(), log_path) as server:
+        host, port = server.server_address[:2]
+        for method in ("PATCH", "HEAD", "OPTIONS", "TRACE", "PROPFIND"):
+            with pytest.raises(urllib.error.HTTPError) as caught:
+                _request(f"http://{host}:{port}/", method=method)
+            assert caught.value.code == 405, method
+            assert caught.value.headers["Allow"] == "GET", method
+
+
 # --- AC5: the Board imports nothing from the alarm sinks or the runner ----------
 
 

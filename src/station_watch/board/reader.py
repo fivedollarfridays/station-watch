@@ -3,10 +3,11 @@
 The Board must never create schema or write a row, so it opens the SQLite store
 through a ``mode=ro`` URI rather than the :class:`~station_watch.log.Log`
 constructor (which runs ``CREATE TABLE`` and is the sole writer). A ``mode=ro``
-connection cannot create the database file, cannot create the ``-wal``/``-shm``
-side files, and raises ``sqlite3.OperationalError`` on any write -- so a missing
-Log is caught at open time and an accidental write is impossible, not merely
-unused.
+connection cannot create the database file and raises ``sqlite3.OperationalError``
+on any write -- so a missing Log is caught at open time and an accidental write is
+impossible, not merely unused. (SQLite itself may create or touch the WAL-mode
+``-wal``/``-shm`` side files a reader needs for its read snapshot; the Log's rows and
+the database file's bytes are never changed.)
 
 Rows are rebuilt into the same frozen record dataclasses the writer stored, using
 the Log's own kind map, so the Board reads exactly what Capture, Judge and Alarm
