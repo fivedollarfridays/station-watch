@@ -69,7 +69,7 @@ Run a fault drill to measure time-to-alarm against the real `run` pipeline. Synt
 station-watch drill --config config/station-example.yaml --log drill.db --out drill.json --schedule schedule.yaml
 ```
 
-Live mode runs a real camera while you inject faults physically and type `start`/`clear <fault>` on stdin:
+Live mode runs a real camera while you inject faults physically and type `start`/`clear <fault>` on stdin (for example `start lens_covered`, then `clear lens_covered` once the lens is uncovered). Press Ctrl-D when the drill is over: the run stops at its next cycle and writes the measurement and table. Ctrl-C also stops it and writes what was measured, but exits non-zero because the drill was cut short:
 
 ```bash
 station-watch drill --config config/station-example.yaml --log drill.db --out drill.json --live --source 0

@@ -8,7 +8,7 @@ never cite it) and exits zero. It never substitutes synthetic or estimated numbe
 
 A physics table that does not exist yet therefore *says so in the repo*: the committed
 ``measurements/physics/<name>.json`` is that ``no_input`` stub. Real results write the
-HF2.8 measurement format under ``measurements/v1/``; ``--synthetic`` (test only) writes
+shared measurement format under ``measurements/v1/``; ``--synthetic`` (test only) writes
 a scored run only into the given ``--out``, stamped ``dataset_kind: synthetic``.
 """
 
@@ -76,7 +76,7 @@ def _write_no_input(dest: Path, name: str, reason: str, command: str) -> None:
 
 
 def _measurement(script, selected, manifest, config, dataset_kind, config_sha):
-    """Score ``selected`` and write one HF2.8-format measurement file's parts."""
+    """Score ``selected`` and write one shared-format measurement file's parts."""
     metrics = script.measure(selected, config, _real_backend_factory(config))
     provenance = build_provenance(
         dataset=manifest.dataset,

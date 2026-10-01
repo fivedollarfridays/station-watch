@@ -25,7 +25,7 @@ def write_measurement(path: str | Path, provenance: dict, metrics: dict) -> None
 
     The single writer every measurement file goes through (the evaluate harness and
     the fault drill both call it), so there is never a second on-disk shape for the
-    HF2.9 claims test to chase -- metric keys stay addressable as dotted paths under
+    claims test to chase -- metric keys stay addressable as dotted paths under
     ``metrics``.
     """
     payload = {"provenance": provenance, "metrics": metrics}

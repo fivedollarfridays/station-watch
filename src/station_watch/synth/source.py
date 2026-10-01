@@ -1,7 +1,7 @@
 """A live-paced synthetic frame source with the ``FrameSource`` surface.
 
 :class:`SyntheticSource` renders fresh, noisy station frames from the *same*
-HF2.1 renderer the proving clips use (:mod:`station_watch.synth.station`), one
+station renderer the proving clips use (:mod:`station_watch.synth.station`), one
 frame per :meth:`read`, paced to a set ``fps`` on the wall clock -- so a bench-free
 drill can drive the real Capture loop against synthetic frames exactly as it would
 a live camera. No second renderer is introduced: every frame comes from

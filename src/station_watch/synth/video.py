@@ -5,10 +5,10 @@ per-frame Gaussian sensor noise, so consecutive frames of a "live" camera differ
 even when nothing in the scene moves. The bytes are written with a **lossless**
 codec -- FFV1 in an ``.mkv`` when the local OpenCV can open that writer,
 otherwise a PNG image sequence that ``cv2.VideoCapture`` reads through the same
-file path -- so the injected noise survives decoding and HF1.4 can rely on
+file path -- so the injected noise survives decoding and Capture's blind detection can rely on
 consecutive live frames having distinct fingerprints.
 
-Fault knobs match the blind conditions HF1.4 must detect. Each ``*_from`` knob
+Fault knobs match the blind conditions Capture must detect. Each ``*_from`` knob
 takes an optional ``*_until`` bound so a clip can go bad and then recover, which
 is what the opened-then-cleared blind tests need:
 

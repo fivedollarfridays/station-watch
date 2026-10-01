@@ -15,7 +15,7 @@ width ``(sum g)^2 / sum(g^2)`` is ``L``. Averaging the edge profile over the mar
 height first beats the sensor noise down so a single clean edge remains.
 
 It reads frames and runs HF2's ``Detector``/``PositionTracker``; it never runs the
-Judge. ``--synthetic`` (test only) blurs HF2.1-rendered frames with a known kernel.
+Judge. ``--synthetic`` (test only) blurs synthetic-station frames with a known kernel.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ class ExposureBlur:
         return "exposure_s" in clip.tags and "speed_m_s" in clip.tags
 
     def build_synthetic(self, work_dir):
-        """The ``--synthetic`` proving input: HF2.1 frames blurred by a known kernel."""
+        """The ``--synthetic`` proving input: synthetic station frames blurred by a known kernel."""
         from station_watch.physics.synthetic_blur import build_synthetic
 
         return build_synthetic(work_dir)

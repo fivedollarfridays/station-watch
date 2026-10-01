@@ -7,8 +7,8 @@ src-side tools -- the fault drill, the physics scripts, and ``evaluate
 keeps importing them unchanged.
 
 * :func:`write_synth_clip` -- the HF1 static-scene clip writer.
-* :func:`write_synth_station_clip` -- the HF2.1 panel-bench clip writer + ground truth.
-* :class:`SyntheticSource` -- a live-paced source over the HF2.1 renderer.
+* :func:`write_synth_station_clip` -- the synthetic panel-bench clip writer + ground truth.
+* :class:`SyntheticSource` -- a live-paced source over the synthetic station renderer.
 
 The submodules pull in OpenCV, so they are imported lazily to keep merely importing
 the package cheap (as :mod:`station_watch.evaluate` does for its heavy harness).

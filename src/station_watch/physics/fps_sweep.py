@@ -7,8 +7,8 @@ plus whether the event was still detected and the aggregate detection rate. A lo
 frame rate that drops every frame of a short reach is the failure this surfaces: the
 predicted and measured counts sit side by side so the gap is visible, never hidden.
 
-The sweep consumes the HF2.8 manifest, selecting clips tagged with their native
-``fps`` that carry keep-out intervals, and drives HF2.3's ``Detector`` with HF2.6's
+The sweep consumes the labeled-clip manifest, selecting clips tagged with their native
+``fps`` that carry keep-out intervals, and drives the detect ``Detector`` with its
 injectable keep-out backend (``detect_people`` -- the real YOLOX model for real clips,
 a scripted fake for ``--synthetic``). It reads frames only; it does not run the Judge.
 """

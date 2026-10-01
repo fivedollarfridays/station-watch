@@ -8,7 +8,7 @@ is carried as a :class:`Mark` -- its name and its injection and clear timestamps
   injection is the exact wall-clock instant the :class:`~station_watch.faults.FaultSource`
   begins transforming frames.
 * In a **live** run the operator types ``start <fault>`` / ``clear <fault>`` lines on
-  stdin and each line is stamped as it is read (:func:`read_stdin_marks`); the clear
+  stdin and each line is stamped as it is read (:class:`MarkReader`); the clear
   pairs with the matching open start. The stamped lines are also the live run's
   manifest (their SHA-256 is the provenance ``manifest_sha256``), so what the operator
   did is itself the record.
@@ -54,37 +54,47 @@ def _parse_line(line: str) -> tuple[str, str] | None:
     return parts[0], parts[1]
 
 
-def read_stdin_marks(
-    lines: Iterable[str], *, clock: Callable[[], str] = utc_now_iso
-) -> tuple[list[Mark], str]:
-    """Read ``start``/``clear`` lines, stamping each on the wall clock as it arrives.
+class MarkReader:
+    """Accumulates stamped ``start``/``clear`` lines one at a time.
 
-    Returns the marks (one per ``start``, its ``cleared_ts`` set by a later matching
-    ``clear`` or ``None`` if never cleared) and the stamped-lines text that is the live
-    run's manifest. Unrecognised lines are ignored but still stamped into the manifest,
-    so the record is of exactly what was typed.
+    Each line is stamped on the wall clock as it arrives. A ``start`` opens a mark; a
+    later matching ``clear`` closes it (a mark never cleared keeps ``cleared_ts`` as
+    ``None``). Unrecognised lines are ignored but still stamped into the manifest, so
+    the record is of exactly what was typed.
+
+    Holding the state between lines means an interrupted read (Ctrl-C) still has
+    every mark typed before it, so a cut-short drill can write what it measured.
     """
-    marks: list[Mark] = []
-    open_index: dict[str, int] = {}
-    stamped: list[str] = []
-    for raw in lines:
+
+    def __init__(self, *, clock: Callable[[], str] = utc_now_iso) -> None:
+        self._clock = clock
+        self._marks: list[Mark] = []
+        self._open_index: dict[str, int] = {}
+        self._stamped: list[str] = []
+
+    def feed(self, raw: str) -> None:
+        """Stamp one input line; record it as a mark if it is a ``start``/``clear``."""
         line = raw.strip()
         if not line:
-            continue
-        ts = clock()
-        stamped.append(f"{ts} {line}")
+            return
+        ts = self._clock()
+        self._stamped.append(f"{ts} {line}")
         parsed = _parse_line(line)
         if parsed is None:
-            continue
+            return
         verb, fault = parsed
         if verb == "start":
-            open_index[fault] = len(marks)
-            marks.append(Mark(fault=fault, injected_ts=ts, cleared_ts=None))
-        elif fault in open_index:
-            idx = open_index.pop(fault)
-            marks[idx] = Mark(fault=fault, injected_ts=marks[idx].injected_ts, cleared_ts=ts)
-    manifest = "\n".join(stamped) + ("\n" if stamped else "")
-    return marks, manifest
+            self._open_index[fault] = len(self._marks)
+            self._marks.append(Mark(fault=fault, injected_ts=ts, cleared_ts=None))
+        elif fault in self._open_index:
+            idx = self._open_index.pop(fault)
+            injected = self._marks[idx].injected_ts
+            self._marks[idx] = Mark(fault=fault, injected_ts=injected, cleared_ts=ts)
+
+    def result(self) -> tuple[list[Mark], str]:
+        """The marks so far and the stamped-lines manifest text."""
+        manifest = "\n".join(self._stamped) + ("\n" if self._stamped else "")
+        return list(self._marks), manifest
 
 
 def manifest_sha256(text: str) -> str:
@@ -92,4 +102,4 @@ def manifest_sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-__all__ = ["Mark", "marks_from_schedule", "read_stdin_marks", "manifest_sha256"]
+__all__ = ["Mark", "MarkReader", "marks_from_schedule", "manifest_sha256"]

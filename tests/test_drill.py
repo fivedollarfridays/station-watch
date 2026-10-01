@@ -337,11 +337,14 @@ def test_marks_from_schedule_rebases_offsets_onto_the_run_start():
     assert marks[0].cleared_ts == "2026-01-01T00:00:05.000000+00:00"
 
 
-def test_read_stdin_marks_pairs_start_and_clear_and_hashes_the_manifest():
-    from station_watch.drill.marks import manifest_sha256, read_stdin_marks
+def test_mark_reader_pairs_start_and_clear_and_hashes_the_manifest():
+    from station_watch.drill.marks import MarkReader, manifest_sha256
 
     clock = iter(["t0", "t1", "t2"]).__next__
-    marks, manifest = read_stdin_marks(["start bumped", "noise", "clear bumped"], clock=clock)
+    reader = MarkReader(clock=clock)
+    for line in ["start bumped", "noise", "clear bumped"]:
+        reader.feed(line)
+    marks, manifest = reader.result()
     assert [(m.fault, m.injected_ts, m.cleared_ts) for m in marks] == [("bumped", "t0", "t2")]
     assert manifest_sha256(manifest) == manifest_sha256(manifest)  # deterministic
     assert "noise" in manifest  # unrecognised lines are still recorded in the manifest

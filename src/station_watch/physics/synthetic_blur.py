@@ -1,14 +1,14 @@
-"""The exposure_blur ``--synthetic`` proving input: HF2.1 frames, a known blur kernel.
+"""The exposure_blur ``--synthetic`` proving input: synthetic station frames, a known blur kernel.
 
 ``--synthetic`` is test-only (the CLI help says so). It renders a short clip with the
-HF2.1 station renderer, then blurs every frame with a horizontal box kernel of a known
+synthetic station renderer, then blurs every frame with a horizontal box kernel of a known
 length (:data:`KERNEL_LEN` pixels) -- a stand-in for the smear a moving target leaves
 at a given exposure -- so the blur measurement can be checked against a length it was
 given. The clip is tagged with a camera exposure, a target speed and the marker's
 physical size, the same per-clip tags a real exposure sweep carries.
 
 Everything downstream is the real Detect path: the measurement finds the marker with
-ArUco and reads the rail positions through HF2.2's ``PositionTracker``.
+ArUco and reads the rail positions through the detect ``PositionTracker``.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ def _read_frames(clip_path) -> list[np.ndarray]:
 
 
 def _render_and_blur(clips_dir: Path) -> str:
-    """Render a sharp HF2.1 clip, blur every frame by a known kernel, write the blurred clip."""
+    """Render a sharp synthetic clip, blur every frame by a known kernel, write the result."""
     from station_watch.synth.station import write_synth_station_clip
     from station_watch.synth.video import _write_frames
 

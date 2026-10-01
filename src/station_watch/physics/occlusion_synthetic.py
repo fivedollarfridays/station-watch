@@ -9,7 +9,7 @@ clip back through the real Detect path and its measured occlusion-caused unknown
 fraction must land within a few points of the rendered share.
 
 Nothing here fakes the detector: the hand blob is a real skin-toned blob the
-rail-position reader trips on as ``occluded`` (the same path HF2.3's
+rail-position reader trips on as ``occluded`` (the same path the
 ``test_detect_positions`` proves), so the only synthetic part is the drawn scene.
 """
 

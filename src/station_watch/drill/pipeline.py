@@ -6,7 +6,7 @@ A synthetic drill wraps a :class:`~station_watch.synth.source.SyntheticSource` i
 rows -- with the ``record`` alarm sink. A live drill runs that same Runner on a real
 camera while the operator types ``start``/``clear`` lines on stdin, each stamped on the
 wall clock. Either way the run is read back from the Log and the alarm record into one
-HF2.8-format measurement file (:func:`station_watch.evaluate.provenance.write_measurement`)
+shared-format measurement file (:func:`station_watch.evaluate.provenance.write_measurement`)
 plus a markdown table beside it; no second measurement format is defined.
 """
 
@@ -19,7 +19,7 @@ from pathlib import Path
 
 from station_watch.alarm.sink import RecordSink
 from station_watch.clock import utc_now_iso
-from station_watch.drill.marks import manifest_sha256, marks_from_schedule, read_stdin_marks
+from station_watch.drill.marks import MarkReader, manifest_sha256, marks_from_schedule
 from station_watch.drill.report import assemble_metrics, load_alarm_events
 from station_watch.drill.table import render_table
 from station_watch.evaluate.manifest import sha256_file
@@ -34,6 +34,10 @@ from station_watch.synth.source import SyntheticSource
 EPOCH = "0001-01-01T00:00:00.000000+00:00"
 DEFAULT_FPS = 20.0
 RECOVERY_TAIL_S = 2.0
+# Bound on the wait for the runner to finish its cycle and Capture shutdown after
+# the drill ends; past it the drill fails loud instead of hanging.
+STOP_TIMEOUT_S = 10.0
+INTERRUPTED_EXIT = 130
 
 
 def _alarm_record_path(log_path: str | Path) -> Path:
@@ -124,6 +128,34 @@ def run_synthetic(
     return 0
 
 
+def _read_marks(stdin) -> tuple[list, str, bool]:
+    """Read stdin marks until EOF (Ctrl-D) or Ctrl-C; report whether it was cut short."""
+    reader = MarkReader()
+    interrupted = False
+    try:
+        for line in stdin:
+            reader.feed(line)
+    except KeyboardInterrupt:
+        interrupted = True
+    marks, manifest = reader.result()
+    return marks, manifest, interrupted
+
+
+def _stop_runner(runner, thread: threading.Thread) -> bool:
+    """Ask the runner to stop at its next cycle boundary; ``False`` if it would not."""
+    runner.stop()
+    thread.join(timeout=STOP_TIMEOUT_S)
+    if not thread.is_alive():
+        return True
+    print(
+        f"station-watch: drill runner did not stop within {STOP_TIMEOUT_S:.0f} s of the "
+        "end of input; no measurement written",
+        file=sys.stderr,
+        flush=True,
+    )
+    return False
+
+
 def run_live(
     *,
     config_path: str,
@@ -134,7 +166,12 @@ def run_live(
     max_cycles: int | None = None,
     stdin=None,
 ) -> int:
-    """Run a live fault drill on a real source, stamping stdin start/clear marks."""
+    """Run a live fault drill on a real source, stamping stdin start/clear marks.
+
+    The drill ends when stdin does (Ctrl-D): the runner is stopped at its next cycle
+    boundary and the measurement written. Ctrl-C does the same but exits non-zero, as
+    the drill is incomplete; a runner that will not stop fails loud rather than hang.
+    """
     config = load_config(config_path)
     record_path = _alarm_record_path(log_path)
     context = build_context(
@@ -147,8 +184,9 @@ def run_live(
     runner = Runner(context, run_id=new_run_id(), max_cycles=max_cycles)
     thread = threading.Thread(target=runner.run, name="station-watch-drill", daemon=True)
     thread.start()
-    marks, manifest = read_stdin_marks(stdin if stdin is not None else sys.stdin)
-    thread.join()
+    marks, manifest, interrupted = _read_marks(stdin if stdin is not None else sys.stdin)
+    if not _stop_runner(runner, thread):
+        return 1
     context.log.close()
     metrics = _read_back(log_path, record_path, config, marks)
     provenance = build_provenance(
@@ -161,6 +199,9 @@ def run_live(
         sessions=[],
     )
     _write_outputs(out_path, provenance, metrics, command)
+    if interrupted:
+        print("station-watch: drill interrupted; wrote what was measured", file=sys.stderr)
+        return INTERRUPTED_EXIT
     return 0
 
 

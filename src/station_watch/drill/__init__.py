@@ -4,7 +4,7 @@ A drill injects the five camera faults an operator can cause and measures how fa
 real pipeline alarms and recovers. Synthetic drills render the faults into frames and
 are reproducible in CI; live drills run a real camera on the bench. Both run the one
 :class:`~station_watch.runner.pipeline.Runner` ``station-watch run`` uses and write one
-HF2.8-format measurement file, so a drill's numbers are traceable exactly as an
+shared-format measurement file, so a drill's numbers are traceable exactly as an
 evaluation's are. The CLI wiring lives in :mod:`station_watch.drill.commandline`.
 """
 
