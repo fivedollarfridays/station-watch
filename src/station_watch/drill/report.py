@@ -4,8 +4,9 @@ After the run, each fault is scored from what the real pipeline actually recorde
 the blind reason that opened (from the Log's ``BlindRecord`` rows), the time from
 injection to the first alarm and from clear to the recovery (from the ``record``
 alarm sink file), and whether exactly one alarm and one recovery occurred. Events are
-attributed to a fault by wall-clock window -- an alarm or recovery falls to the fault
-whose injection it follows, up to the next fault's injection -- which is unambiguous
+attributed to a fault by timestamp window on the run's own clock -- an alarm or
+recovery falls to the fault whose injection it follows, up to the next fault's
+injection -- which is unambiguous
 because a schedule's windows never overlap and the gaps between them are healthy.
 
 A fault the pipeline never alarms on is reported with ``alarm: none`` and null times,

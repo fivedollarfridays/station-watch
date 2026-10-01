@@ -3,7 +3,11 @@
 A synthetic drill wraps a :class:`~station_watch.synth.source.SyntheticSource` in a
 :class:`~station_watch.faults.FaultSource` driven by the schedule and runs the real
 :class:`~station_watch.runner.pipeline.Runner` -- Capture, Log, Judge, Alarm and cycle
-rows -- with the ``record`` alarm sink. A live drill runs that same Runner on a real
+rows -- with the ``record`` alarm sink. Being synthetic, it runs on a
+:class:`~station_watch.synth.clock.FrameClock`: the schedule, the Log stamps, Capture's
+liveness and the end of the run are all on the frame index (frame ``k`` at
+``k / fps``), so a wall-clock stall on a loaded machine can neither squeeze a fault nor
+read as a disconnect, and the measurement reproduces. A live drill runs that same Runner on a real
 camera while the operator types ``start``/``clear`` lines on stdin, each stamped on the
 wall clock. Either way the run is read back from the Log and the alarm record into one
 shared-format measurement file (:func:`station_watch.evaluate.provenance.write_measurement`)
@@ -12,13 +16,12 @@ plus a markdown table beside it; no second measurement format is defined.
 
 from __future__ import annotations
 
-import math
 import sys
 import threading
+import time
 from pathlib import Path
 
 from station_watch.alarm.sink import RecordSink
-from station_watch.clock import utc_now_iso
 from station_watch.drill.marks import MarkReader, manifest_sha256, marks_from_schedule
 from station_watch.drill.report import assemble_metrics, load_alarm_events
 from station_watch.drill.table import render_table
@@ -29,6 +32,7 @@ from station_watch.records import BlindState
 from station_watch.run import new_run_id
 from station_watch.runner.pipeline import Runner
 from station_watch.runner.startup import build_context, load_config
+from station_watch.synth.clock import FrameClock
 from station_watch.synth.source import SyntheticSource
 
 EPOCH = "0001-01-01T00:00:00.000000+00:00"
@@ -37,6 +41,11 @@ RECOVERY_TAIL_S = 2.0
 # Bound on the wait for the runner to finish its cycle and Capture shutdown after
 # the drill ends; past it the drill fails loud instead of hanging.
 STOP_TIMEOUT_S = 10.0
+# Bound on the real time a synthetic drill may take to reach the end of its schedule
+# on the frame clock: a fixed allowance plus a generous multiple of the simulated span.
+SYNTH_DEADLINE_BASE_S = 60.0
+SYNTH_DEADLINE_FACTOR = 20.0
+_SIM_POLL_S = 0.05
 INTERRUPTED_EXIT = 130
 
 
@@ -52,18 +61,38 @@ def _ensure_record_sink(context, record_path: Path) -> None:
         context.sinks.append(RecordSink(record_path))
 
 
-def _synthetic_max_cycles(config, schedule, tail_s: float) -> int:
-    last_clear = max((window.clear_s for window in schedule), default=0.0)
-    return max(1, math.ceil((last_clear + tail_s) / config.cycle_interval_s))
+def _synthetic_end_s(schedule, tail_s: float) -> float:
+    """Simulated seconds at which the drill ends: the last clear plus a recovery tail."""
+    return max((window.clear_s for window in schedule), default=0.0) + tail_s
 
 
-def _run_pipeline(context, run_id: str, *, max_cycles: int | None) -> None:
-    """Run the real Runner to completion, closing the Log afterwards."""
-    runner = Runner(context, run_id=run_id, max_cycles=max_cycles)
+def _await_sim_end(clock: FrameClock, end_s: float, thread: threading.Thread) -> bool:
+    """Wait (bounded, on the real clock) until the frame clock reaches ``end_s``."""
+    deadline = time.monotonic() + SYNTH_DEADLINE_BASE_S + SYNTH_DEADLINE_FACTOR * end_s
+    while clock.now() < end_s:
+        if not thread.is_alive() or time.monotonic() > deadline:
+            print(
+                f"station-watch: synthetic drill did not reach {end_s:.1f} s of simulated time "
+                f"(at {clock.now():.2f} s); no measurement written",
+                file=sys.stderr,
+                flush=True,
+            )
+            return False
+        time.sleep(_SIM_POLL_S)
+    return True
+
+
+def _run_on_frame_clock(context, clock: FrameClock, end_s: float) -> bool:
+    """Run the real Runner on the frame clock until ``end_s``; ``False`` on a failed run."""
+    runner = Runner(context, run_id=new_run_id(), clock=clock.iso, monotonic=clock.mono)
+    thread = threading.Thread(target=runner.run, name="station-watch-drill", daemon=True)
+    thread.start()
     try:
-        runner.run()
+        reached = _await_sim_end(clock, end_s, thread)
     finally:
+        stopped = _stop_runner(runner, thread)
         context.log.close()
+    return reached and stopped
 
 
 def _read_back(log_path: str | Path, record_path: Path, config, marks) -> dict:
@@ -94,14 +123,14 @@ def run_synthetic(
     """Run a synthetic fault drill from a schedule and write its measurement + table."""
     config = load_config(config_path)
     schedule = load_fault_schedule(schedule_path)
+    clock = FrameClock(fps)
     source = FaultSource(
-        SyntheticSource(fps=fps),
+        SyntheticSource(fps=fps, clock=clock),
         schedule,
         dark_luma_threshold=config.dark_luma_threshold,
         tolerance_px=config.fiducial["tolerance_px"],
+        now=clock.upcoming,
     )
-    run_start_ts = utc_now_iso()
-    marks = marks_from_schedule(schedule, run_start_ts)
     record_path = _alarm_record_path(log_path)
     context = build_context(
         config_path=config_path,
@@ -111,9 +140,10 @@ def run_synthetic(
         source=source,
     )
     _ensure_record_sink(context, record_path)
-    _run_pipeline(
-        context, new_run_id(), max_cycles=_synthetic_max_cycles(config, schedule, RECOVERY_TAIL_S)
-    )
+    if not _run_on_frame_clock(context, clock, _synthetic_end_s(schedule, RECOVERY_TAIL_S)):
+        return 1
+    # Marks rebase the schedule onto frame 0 of the same clock the Log was stamped on.
+    marks = marks_from_schedule(schedule, clock.base_iso())
     metrics = _read_back(log_path, record_path, config, marks)
     provenance = build_provenance(
         dataset=f"drill:{Path(schedule_path).stem}",
@@ -149,7 +179,7 @@ def _stop_runner(runner, thread: threading.Thread) -> bool:
         return True
     print(
         f"station-watch: drill runner did not stop within {STOP_TIMEOUT_S:.0f} s of the "
-        "end of input; no measurement written",
+        "end of the drill; no measurement written",
         file=sys.stderr,
         flush=True,
     )

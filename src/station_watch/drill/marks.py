@@ -1,12 +1,14 @@
-"""Fault *marks*: when each fault was injected and cleared, on the wall clock.
+"""Fault *marks*: when each fault was injected and cleared, on the run's clock.
 
 A drill measures time-to-alarm from the moment a fault was injected, so every fault
-is carried as a :class:`Mark` -- its name and its injection and clear timestamps.
+is carried as a :class:`Mark` -- its name and its injection and clear timestamps,
+on the same clock the run stamped its Log with.
 
 * In a **synthetic** run the schedule's ``start_s`` / ``clear_s`` offsets are
-  rebased onto the run's start time (:func:`marks_from_schedule`), so a window's
-  injection is the exact wall-clock instant the :class:`~station_watch.faults.FaultSource`
-  begins transforming frames.
+  rebased onto frame 0 of the drill's
+  :class:`~station_watch.synth.clock.FrameClock` (:func:`marks_from_schedule`), so a
+  window's injection is the exact simulated instant the
+  :class:`~station_watch.faults.FaultSource` begins transforming frames.
 * In a **live** run the operator types ``start <fault>`` / ``clear <fault>`` lines on
   stdin and each line is stamped as it is read (:class:`MarkReader`); the clear
   pairs with the matching open start. The stamped lines are also the live run's

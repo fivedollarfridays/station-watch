@@ -1,4 +1,4 @@
-"""Inject camera faults into any frame source on a wall-clock schedule.
+"""Inject camera faults into any frame source on a timed schedule.
 
 A bench-free fault drill needs the five camera faults an operator can actually
 cause, applied to a live source (synthetic or a real :class:`FrameSource`) so the
@@ -40,7 +40,7 @@ FAULT_NAMES = frozenset({"lens_covered", "frozen", "bumped", "cable_pulled", "li
 
 @dataclass(frozen=True)
 class FaultWindow:
-    """One scheduled fault open over ``[start_s, clear_s)`` on the wall clock."""
+    """One scheduled fault open over ``[start_s, clear_s)`` on the schedule's clock."""
 
     fault: str
     start_s: float
@@ -59,7 +59,12 @@ class FaultSource:
     ``tolerance_px`` are the station's own thresholds, so a darkened frame lands
     under the blind monitor's bar and a bumped frame lands beyond the view-shift
     monitor's. ``now`` is injectable so a drill or a test can drive the schedule on
-    a controlled clock.
+    a controlled clock: the synthetic drill passes its
+    :class:`~station_watch.synth.clock.FrameClock`'s ``upcoming`` (the time of the
+    frame about to be read), so windows span frames rather than wall time and the
+    schedule's origin is frame 0. The schedule is measured from construction on the
+    ``now`` clock; a frame clock does not advance until the first frame is read.
+    A source with a ``drop()`` method is told when a pulled cable swallows its slot.
     """
 
     def __init__(
@@ -97,15 +102,17 @@ class FaultSource:
         """The next frame, transformed by whichever fault window is open now."""
         fault = self._active_fault()
         if fault == "cable_pulled":
+            drop = getattr(self._source, "drop", None)
+            if drop is not None:
+                drop()  # a frame-clocked source's slot passes undelivered
             return None
+        # Every other fault still consumes the camera's frame slot (a stuck sensor is
+        # still clocking out frames), so a frame-index clock keeps advancing.
+        frame = self._source.read()
         if fault == "frozen":
             if self._last_good is None:
-                frame = self._source.read()
-                if frame is None:
-                    return None
                 self._last_good = frame
             return self._last_good
-        frame = self._source.read()
         if frame is None:
             return None
         if fault is None:

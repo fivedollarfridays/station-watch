@@ -240,23 +240,29 @@ def _board_once(config, log):
     return _run_cli("board", "--config", str(config), "--log", str(log), "--once")
 
 
-def _wait_board_shows_open(config, log, deadline_s=25.0):
-    # Wait for the alarm episode itself, not just the blind reason: the BlindRecord
-    # opens a cycle before AlarmEvaluated lists the episode, and a snapshot taken in
-    # that gap legitimately shows "blind: dark" with "open episodes: none".
+def _wait_board_shows(config, log, *needles, deadline_s=25.0):
+    """Poll the real Board CLI until one snapshot contains every needle (or time out)."""
     start = time.monotonic()
     while time.monotonic() - start < deadline_s:
         result = _board_once(config, log)
-        if result.returncode == 0 and "unobservable:dark" in result.stdout:
+        if result.returncode == 0 and all(needle in result.stdout for needle in needles):
             return result.stdout
         time.sleep(0.1)
     return None
 
 
 def test_e2e_board_shows_drill_open_and_recovered_episodes(tmp_path):
-    # One wide dark window gives a stable interval to snapshot the open episode.
+    # One wide dark window gives a stable interval to snapshot the open episode, and a
+    # later short frozen window keeps the drill running (healthy) long after the dark
+    # one recovers, so the recovered view is read from a *live* run. The drill stamps
+    # its Log on the frame clock, so a Board read after the drill exits could call
+    # the last verdict stale on a slow machine; reading it live does not depend on that.
     schedule = _write_schedule(
-        tmp_path / "s.yaml", [{"fault": "lens_covered", "start_s": 1.0, "clear_s": 5.0}]
+        tmp_path / "s.yaml",
+        [
+            {"fault": "lens_covered", "start_s": 1.0, "clear_s": 4.0},
+            {"fault": "frozen", "start_s": 10.0, "clear_s": 10.3},
+        ],
     )
     log = tmp_path / "log.db"
     proc = subprocess.Popen(
@@ -279,16 +285,15 @@ def test_e2e_board_shows_drill_open_and_recovered_episodes(tmp_path):
         text=True,
     )
     try:
-        open_view = _wait_board_shows_open(CONFIG, log)
+        # Wait for the alarm episode itself, not just the blind reason: the BlindRecord
+        # opens a cycle before AlarmEvaluated lists the episode.
+        open_view = _wait_board_shows(CONFIG, log, "unobservable:dark")
         assert open_view is not None, "the board never showed the drill's open dark episode"
-        assert "unobservable:dark" in open_view, open_view
+        recovered = _wait_board_shows(CONFIG, log, "HEALTHY", "open episodes: none")
+        assert recovered is not None, "the board never showed the drill's dark episode recovered"
     finally:
-        proc.wait(timeout=40)
-
-    recovered = _board_once(CONFIG, log)
-    assert recovered.returncode == 0, recovered.stderr
-    assert "HEALTHY" in recovered.stdout, recovered.stdout
-    assert "open episodes: none" in recovered.stdout, recovered.stdout
+        proc.wait(timeout=60)
+    assert proc.returncode == 0, proc.stderr.read() if proc.stderr else ""
 
 
 # --- AC7: a missing schedule (synthetic) or source (live) fails loud, naming it ---

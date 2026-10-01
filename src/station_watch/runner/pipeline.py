@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import sys
 import threading
+import time
 from collections.abc import Callable
 
 from station_watch.alarm.episodes import Alarm
@@ -61,6 +62,7 @@ class Runner:
         max_cycles: int | None = None,
         speed: float = 1.0,
         clock: Callable[[], str] = utc_now_iso,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self._config = context.config
         self._source = context.source
@@ -74,6 +76,7 @@ class Runner:
         self._max_cycles = max_cycles
         self._speed = speed
         self._clock = clock
+        self._monotonic = monotonic
         self._stop = threading.Event()
         self._capture_error: BaseException | None = None
         self._capture_exit_reported = False
@@ -103,6 +106,7 @@ class Runner:
             run_id=self._run_id,
             speed=self._speed,
             clock=self._clock,
+            monotonic=self._monotonic,
             detector=build_detector(self._config, self._run_id, self._keepout_backend),
         )
         thread = threading.Thread(
