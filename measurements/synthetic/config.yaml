@@ -1,0 +1,85 @@
+alarm:
+  sinks:
+  - record
+camera_id: cam-0
+cycle_interval_s: 0.05
+dark_luma_threshold: 15.0
+dark_window_s: 0.3
+detect:
+  blur_threshold: 100.0
+  darkness_threshold: 40.0
+  emit_interval_s: 1.0
+  keepout:
+    min_overlap: 0.1
+    persistence_frames: 2
+  keepout_rois:
+    zone_press:
+      active: true
+      region:
+      - - 4.0
+        - 1.9
+      - - 5.3
+        - 1.9
+      - - 5.3
+        - 3.0
+      - - 4.0
+        - 3.0
+  occlusion_threshold: 0.5
+  persistence_frames: 2
+  rail_positions:
+    rail_pos_1:
+    - - 0.7
+      - 1.9
+    - - 1.7
+      - 1.9
+    - - 1.7
+      - 2.5
+    - - 0.7
+      - 2.5
+    rail_pos_2:
+    - - 2.5
+      - 1.9
+    - - 3.5
+      - 1.9
+    - - 3.5
+      - 2.5
+    - - 2.5
+      - 2.5
+  station_zone:
+    id: bench
+    region:
+    - - 0.3
+      - 1.5
+    - - 5.5
+      - 1.5
+    - - 5.5
+      - 3.5
+    - - 0.3
+      - 3.5
+    track_motion: true
+  unknown_grace_s: 10000.0
+fiducial:
+  dictionary_id: DICT_4X4_50
+  expected_center_px:
+  - 58
+  - 58
+  marker_id: 0
+  tolerance_px: 10
+  window_s: 0.2
+frozen_frames: 10000
+grace_s: 0.1
+keepout_zones:
+- zone_press
+liveness_window_s: 2.0
+recover_good_frames: 3
+recover_healthy_verdicts: 2
+required_slots:
+- rail_pos_1
+- rail_pos_2
+station_id: station-1
+takt_s: 0.2
+watchdog:
+  alarm_eval_window_s: 1.0
+  cycle_window_s: 1.0
+  sinks:
+  - record

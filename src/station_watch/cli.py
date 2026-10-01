@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_run_parser(sub)
     _add_watchdog_parser(sub)
     _add_fetch_model_parser(sub)
+    _add_evaluate_parser(sub)
     return parser
 
 
@@ -113,6 +114,18 @@ def _add_fetch_model_parser(sub) -> None:
     )
 
 
+def _add_evaluate_parser(sub) -> None:
+    from station_watch.evaluate.commandline import add_parser
+
+    add_parser(sub)
+
+
+def _evaluate(args) -> int:
+    from station_watch.evaluate.commandline import handle
+
+    return handle(args)
+
+
 def _fetch_model(args) -> int:
     from station_watch.detect.yolox import (
         MODEL_LICENSE,
@@ -186,6 +199,8 @@ def main(argv: list[str] | None = None) -> int:
         return _watchdog(args)
     if args.command == "fetch-model":
         return _fetch_model(args)
+    if args.command == "evaluate":
+        return _evaluate(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 

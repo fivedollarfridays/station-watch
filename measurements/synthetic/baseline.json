@@ -1,0 +1,263 @@
+{
+  "metrics": {
+    "confusion_matrix": {
+      "absent": {
+        "absent": 0,
+        "none": 1,
+        "present": 0,
+        "unknown": 0
+      },
+      "present": {
+        "absent": 0,
+        "none": 9,
+        "present": 0,
+        "unknown": 0
+      },
+      "unknown": {
+        "absent": 0,
+        "none": 2,
+        "present": 0,
+        "unknown": 0
+      }
+    },
+    "cycle_time_creep": {
+      "fn": 0,
+      "fp": 0,
+      "precision": null,
+      "recall": null,
+      "tn": 5,
+      "tp": 0
+    },
+    "keepout_entry": {
+      "fn": 1,
+      "fp": 0,
+      "precision": null,
+      "recall": 0.0,
+      "tn": 4,
+      "tp": 0
+    },
+    "latency": {
+      "count": 0,
+      "median_s": 0.0,
+      "p95_s": 0.0
+    },
+    "missing_part": {
+      "fn": 1,
+      "fp": 0,
+      "precision": null,
+      "recall": 0.0,
+      "tn": 4,
+      "tp": 0
+    },
+    "per_session": {
+      "s1": {
+        "confusion_matrix": {
+          "absent": {
+            "absent": 0,
+            "none": 1,
+            "present": 0,
+            "unknown": 0
+          },
+          "present": {
+            "absent": 0,
+            "none": 5,
+            "present": 0,
+            "unknown": 0
+          },
+          "unknown": {
+            "absent": 0,
+            "none": 2,
+            "present": 0,
+            "unknown": 0
+          }
+        },
+        "cycle_time_creep": {
+          "fn": 0,
+          "fp": 0,
+          "precision": null,
+          "recall": null,
+          "tn": 3,
+          "tp": 0
+        },
+        "keepout_entry": {
+          "fn": 0,
+          "fp": 0,
+          "precision": null,
+          "recall": null,
+          "tn": 3,
+          "tp": 0
+        },
+        "latency": {
+          "count": 0,
+          "median_s": 0.0,
+          "p95_s": 0.0
+        },
+        "missing_part": {
+          "fn": 1,
+          "fp": 0,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 2,
+          "tp": 0
+        },
+        "rail_position_states": {
+          "absent": {
+            "precision": null,
+            "recall": 0.0,
+            "support": 1
+          },
+          "present": {
+            "precision": null,
+            "recall": 0.0,
+            "support": 5
+          },
+          "unknown": {
+            "precision": null,
+            "recall": 0.0,
+            "support": 2
+          }
+        },
+        "stalled": {
+          "fn": 0,
+          "fp": 0,
+          "precision": null,
+          "recall": null,
+          "tn": 3,
+          "tp": 0
+        },
+        "time_to_alarm": [
+          {
+            "clip": "s1/blind/clip.mkv",
+            "reason": "fiducial_missing",
+            "seconds": null,
+            "start_frame": 16
+          }
+        ]
+      },
+      "s2": {
+        "confusion_matrix": {
+          "absent": {
+            "absent": 0,
+            "none": 0,
+            "present": 0,
+            "unknown": 0
+          },
+          "present": {
+            "absent": 0,
+            "none": 4,
+            "present": 0,
+            "unknown": 0
+          },
+          "unknown": {
+            "absent": 0,
+            "none": 0,
+            "present": 0,
+            "unknown": 0
+          }
+        },
+        "cycle_time_creep": {
+          "fn": 0,
+          "fp": 0,
+          "precision": null,
+          "recall": null,
+          "tn": 2,
+          "tp": 0
+        },
+        "keepout_entry": {
+          "fn": 1,
+          "fp": 0,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 1,
+          "tp": 0
+        },
+        "latency": {
+          "count": 0,
+          "median_s": 0.0,
+          "p95_s": 0.0
+        },
+        "missing_part": {
+          "fn": 0,
+          "fp": 0,
+          "precision": null,
+          "recall": null,
+          "tn": 2,
+          "tp": 0
+        },
+        "rail_position_states": {
+          "absent": {
+            "precision": null,
+            "recall": null,
+            "support": 0
+          },
+          "present": {
+            "precision": null,
+            "recall": 0.0,
+            "support": 4
+          },
+          "unknown": {
+            "precision": null,
+            "recall": null,
+            "support": 0
+          }
+        },
+        "stalled": {
+          "fn": 1,
+          "fp": 0,
+          "precision": null,
+          "recall": 0.0,
+          "tn": 1,
+          "tp": 0
+        },
+        "time_to_alarm": []
+      }
+    },
+    "rail_position_states": {
+      "absent": {
+        "precision": null,
+        "recall": 0.0,
+        "support": 1
+      },
+      "present": {
+        "precision": null,
+        "recall": 0.0,
+        "support": 9
+      },
+      "unknown": {
+        "precision": null,
+        "recall": 0.0,
+        "support": 2
+      }
+    },
+    "stalled": {
+      "fn": 1,
+      "fp": 0,
+      "precision": null,
+      "recall": 0.0,
+      "tn": 4,
+      "tp": 0
+    },
+    "time_to_alarm": [
+      {
+        "clip": "s1/blind/clip.mkv",
+        "reason": "fiducial_missing",
+        "seconds": null,
+        "start_frame": 16
+      }
+    ]
+  },
+  "provenance": {
+    "clips": 5,
+    "config_sha256": "e96b07e6f1187bb3dc09c00927584e24d3f6c0d55355f9e2bf7248691bb27ac8",
+    "dataset": "synthetic-proving",
+    "dataset_kind": "synthetic",
+    "date_utc": "2026-10-01",
+    "detector": "frame_diff_baseline:v1",
+    "git_commit": "e72497889f82dd4aeebc4b3d083b9d6f36908726",
+    "manifest_sha256": "11dab94ca1f7078dab2999c6c48c2a32d24666509f8e531ea2ca1e071efa2e05",
+    "sessions": [
+      "s1",
+      "s2"
+    ]
+  }
+}
