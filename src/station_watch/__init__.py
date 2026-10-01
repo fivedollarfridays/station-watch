@@ -74,8 +74,13 @@ def __getattr__(name: str):
         import station_watch.synth as synth
 
         return getattr(synth, name)
-    if name in ("FaultSource", "FaultWindow", "FaultScheduleError", "load_fault_schedule",
-                "FAULT_NAMES"):
+    if name in (
+        "FaultSource",
+        "FaultWindow",
+        "FaultScheduleError",
+        "load_fault_schedule",
+        "FAULT_NAMES",
+    ):
         import station_watch.faults as faults
 
         return getattr(faults, name)

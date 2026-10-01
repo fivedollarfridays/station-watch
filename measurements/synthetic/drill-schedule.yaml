@@ -1,0 +1,9 @@
+# SYNTHETIC fault drill schedule: all five camera faults, in sequence, with healthy
+# gaps between them so each fault opens exactly one alarm episode and recovers before
+# the next. Offsets are seconds from the run's start on the wall clock.
+faults:
+- {fault: lens_covered, start_s: 1.0, clear_s: 2.0}
+- {fault: frozen, start_s: 3.2, clear_s: 4.2}
+- {fault: bumped, start_s: 5.4, clear_s: 6.4}
+- {fault: cable_pulled, start_s: 7.6, clear_s: 8.6}
+- {fault: lights_off, start_s: 9.8, clear_s: 10.8}

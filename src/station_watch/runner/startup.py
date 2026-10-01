@@ -121,12 +121,20 @@ def open_source(spec: str) -> FrameSource:
 def build_context(
     *,
     config_path: str,
-    source_spec: str,
+    source_spec: str | None,
     log_path: str,
     alarm_record: str | None,
     observations_path: str | None = None,
+    source: FrameSource | None = None,
 ) -> RunContext:
-    """Validate and open everything the runner needs; raise StartupError on any gap."""
+    """Validate and open everything the runner needs; raise StartupError on any gap.
+
+    ``source`` lets a caller supply an already-built frame source (the drill wraps a
+    :class:`~station_watch.synth.source.SyntheticSource` in a
+    :class:`~station_watch.faults.FaultSource`) instead of opening one from
+    ``source_spec``; everything else is validated and opened identically, so the
+    pipeline the drill runs is the one ``run`` wires.
+    """
     config = load_config(config_path)
     if observations_path is not None and detect_targets_configured(config):
         raise StartupError(
@@ -137,11 +145,15 @@ def build_context(
     stall_window_s, stall_window_source = resolve_stall_window_or_fail(config)
     sinks = build_alarm_sinks(config, record_path=alarm_record)
     log = open_log(log_path)
-    try:
-        source = open_source(source_spec)
-    except StartupError:
-        log.close()
-        raise
+    if source is None:
+        if source_spec is None:
+            log.close()
+            raise StartupError("no capture source given (pass a source spec or a built source)")
+        try:
+            source = open_source(source_spec)
+        except StartupError:
+            log.close()
+            raise
     return RunContext(
         config=config,
         source=source,

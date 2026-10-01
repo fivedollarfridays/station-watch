@@ -1,0 +1,76 @@
+# Station config for the SYNTHETIC fault drill (bench-free, CI-reproducible).
+#
+# Tuned so every one of the five camera faults trips quickly and recovers inside a
+# short window: small frozen-frame count, short dark/fiducial windows, and no keep-out
+# zone (so the run needs no downloaded person model). The synthetic bench marker is
+# rendered at centre (58, 58); motion tracking is off so a still rendered scene never
+# reads as a stall between faults.
+station_id: station-1
+camera_id: cam-0
+takt_s: 30.0
+grace_s: 5.0
+required_slots:
+- rail_pos_1
+- rail_pos_2
+keepout_zones: []
+liveness_window_s: 1.0
+dark_luma_threshold: 15.0
+dark_window_s: 0.3
+frozen_frames: 5
+recover_good_frames: 3
+cycle_interval_s: 0.05
+recover_healthy_verdicts: 2
+fiducial:
+  dictionary_id: DICT_4X4_50
+  marker_id: 0
+  expected_center_px:
+  - 58
+  - 58
+  tolerance_px: 10
+  window_s: 0.2
+alarm:
+  sinks:
+  - record
+watchdog:
+  cycle_window_s: 1.0
+  alarm_eval_window_s: 1.0
+  sinks:
+  - record
+detect:
+  persistence_frames: 2
+  emit_interval_s: 0.2
+  rail_positions:
+    rail_pos_1:
+    - - 0.7
+      - 1.9
+    - - 1.7
+      - 1.9
+    - - 1.7
+      - 2.5
+    - - 0.7
+      - 2.5
+    rail_pos_2:
+    - - 2.5
+      - 1.9
+    - - 3.5
+      - 1.9
+    - - 3.5
+      - 2.5
+    - - 2.5
+      - 2.5
+  station_zone:
+    id: bench
+    region:
+    - - 0.3
+      - 1.5
+    - - 5.5
+      - 1.5
+    - - 5.5
+      - 3.5
+    - - 0.3
+      - 3.5
+  keepout_rois: {}
+  blur_threshold: 100.0
+  darkness_threshold: 40.0
+  occlusion_threshold: 0.5
+  unknown_grace_s: 10000.0
