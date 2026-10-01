@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from station_watch.clock import parse_iso
-from station_watch.records import Observation, ObservationKind
+from station_watch.records import Fault, FaultKind, Observation, ObservationKind
 
 _MOTION_KINDS = (ObservationKind.MOTION, ObservationKind.NO_MOTION)
 
@@ -141,6 +141,42 @@ def resolve_stall_window(config) -> tuple[float, str]:
     return p95 + grace, f"measured step times {path} (p95 {p95:.1f} s)"
 
 
+def _least_squares_slope(values: list[float]) -> float:
+    """Slope of ``values`` against their index 0..n-1 (least squares, n >= 2)."""
+    n = len(values)
+    x_mean = (n - 1) / 2.0
+    y_mean = sum(values) / n
+    numerator = sum((i - x_mean) * (v - y_mean) for i, v in enumerate(values))
+    denominator = sum((i - x_mean) ** 2 for i in range(n))  # > 0 for n >= 2
+    return numerator / denominator
+
+
+def cycle_time_creep_faults(by_target, config, stall_window: float) -> list[Fault]:
+    """K12: a rising step-duration slope on the station zone, before it ever stalls.
+
+    Over the last ``detect.slope.window_steps`` completed steps, fit a least-squares
+    slope of duration against step index; raise ``cycle_time_creep`` when it is at
+    least ``detect.slope.min_s_per_step`` and the newest step is still under the
+    stall window (a stall is the Judge's own, separate fault). Fewer than
+    ``window_steps`` steps is no verdict. No ``detect.slope`` section: feature off.
+    """
+    slope_cfg = config.detect.get("slope")
+    if not slope_cfg:
+        return []
+    window_steps = slope_cfg["window_steps"]
+    zone = config.detect["station_zone"]["id"]
+    steps = step_durations(by_target.get(zone, []))
+    if len(steps) < window_steps:
+        return []
+    window = steps[-window_steps:]
+    if _least_squares_slope([s.duration_s for s in window]) < slope_cfg["min_s_per_step"]:
+        return []
+    if window[-1].duration_s >= stall_window:
+        return []
+    frame_ids = tuple(sorted({f for s in window for f in (s.start_frame_id, s.end_frame_id)}))
+    return [Fault(FaultKind.CYCLE_TIME_CREEP, zone, frame_ids)]
+
+
 __all__ = [
     "Step",
     "StepTimesError",
@@ -149,4 +185,5 @@ __all__ = [
     "write_step_times",
     "read_step_times",
     "resolve_stall_window",
+    "cycle_time_creep_faults",
 ]

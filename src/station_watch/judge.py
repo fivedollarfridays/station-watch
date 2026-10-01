@@ -39,6 +39,7 @@ from station_watch.records import (
     Verdict,
     VerdictState,
 )
+from station_watch.steps import cycle_time_creep_faults
 
 _PART_KINDS = frozenset(
     {ObservationKind.PART_PRESENT, ObservationKind.PART_ABSENT, ObservationKind.PART_UNKNOWN}
@@ -123,6 +124,7 @@ class Judge:
             *self._stall_faults(by_target, now),
             *self._missing_part_faults(by_target),
             *self._keepout_faults(by_target),
+            *cycle_time_creep_faults(by_target, self._config, self._stall_window),
         ]
 
     def _stall_faults(self, by_target, now: str) -> list[Fault]:

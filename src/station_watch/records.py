@@ -53,6 +53,7 @@ class FaultKind(StrEnum):
     STALLED = "stalled"
     MISSING_PART = "missing_part"
     KEEPOUT_ENTRY = "keepout_entry"
+    CYCLE_TIME_CREEP = "cycle_time_creep"
 
 
 @dataclass(frozen=True)

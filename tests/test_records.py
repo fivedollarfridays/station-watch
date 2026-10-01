@@ -1,6 +1,7 @@
 """Round-trip, validation and idempotency-key tests for the shared record formats."""
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -125,6 +126,17 @@ def test_record_ids_match_per_type_rule():
     assert sample_verdict().record_id == f"{RUN}:verdict:ST1:0"
     assert sample_cycle().record_id == f"{RUN}:cycle:3"
     assert sample_alarm().record_id == f"{RUN}:alarm_eval:0"
+
+
+def test_cycle_time_creep_fault_kind_round_trips():
+    # K12 added cycle_time_creep; a verdict carrying it must round-trip unchanged.
+    verdict = replace(
+        sample_verdict(),
+        faults=(Fault(kind=FaultKind.CYCLE_TIME_CREEP, target="bench", frame_ids=(1, 9)),),
+    )
+    restored = Verdict.from_json(verdict.to_json())
+    assert restored == verdict
+    assert restored.faults[0].kind is FaultKind.CYCLE_TIME_CREEP
 
 
 def test_record_id_is_deterministic():
