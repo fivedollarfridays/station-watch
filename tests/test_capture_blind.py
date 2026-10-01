@@ -56,11 +56,33 @@ def _blinds(log: Log, reason: BlindReason | None = None, state: BlindState | Non
     return records
 
 
-def _run_clip(path, log, thresholds, *, real_time=False, speed=1.0) -> None:
-    kwargs = {"speed": speed}
-    if not real_time:
-        kwargs["sleep"] = lambda _s: None
-    source = FrameSource(str(path))
+class _ReplayClock:
+    """A fake monotonic clock that only moves when Capture's pacer sleeps.
+
+    Paced replay on the wall clock measures the CI scheduler, not the detector: a
+    stall makes ``Capture._pace`` burst the backlog with no sleep, squeezing a
+    fault's ``capture_mono`` span under its window. On this clock frame ``k`` is
+    stamped at ``k / fps`` however loaded the machine is.
+    """
+
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += max(seconds, 0.0)
+
+
+def _run_clip(path, log, thresholds, *, paced=False, source=None) -> None:
+    """Replay a clip through Capture: back to back, or paced on a ``_ReplayClock``."""
+    if paced:
+        clock = _ReplayClock()
+        kwargs = {"monotonic": clock.monotonic, "sleep": clock.sleep}
+    else:
+        kwargs = {"sleep": lambda _s: None}
+    source = source if source is not None else FrameSource(str(path))
     cap = Capture(source, station_id=STATION, camera_id=CAMERA, run_id=RUN, **kwargs)
     cap.run(log, thresholds)
 
@@ -93,7 +115,7 @@ def test_still_but_live_clip_opens_no_frozen_record(tmp_path):
 def test_dark_clip_opens_a_dark_record_with_evidence(tmp_path):
     path = write_synth_clip(tmp_path / "dark", frames=20, dark_from=4, fps=20, seed=4)
     log = Log(tmp_path / "dark.db")
-    _run_clip(path, log, _thresholds(), real_time=True)
+    _run_clip(path, log, _thresholds(), paced=True)
 
     opened = _blinds(log, BlindReason.DARK, BlindState.OPENED)
     assert len(opened) == 1
@@ -108,7 +130,7 @@ def test_single_dark_frame_is_flicker_not_dark(tmp_path):
         tmp_path / "flicker", frames=20, dark_from=8, dark_until=9, fps=20, seed=3
     )
     log = Log(tmp_path / "flicker.db")
-    _run_clip(path, log, _thresholds(), real_time=True)
+    _run_clip(path, log, _thresholds(), paced=True)
 
     assert _blinds(log, BlindReason.DARK) == []
 
@@ -119,12 +141,40 @@ def test_single_dark_frame_is_flicker_not_dark(tmp_path):
 def test_missing_marker_opens_a_fiducial_missing_record(tmp_path):
     path = write_synth_clip(tmp_path / "fid", frames=20, hide_marker_from=4, fps=20, seed=5)
     log = Log(tmp_path / "fid.db")
-    _run_clip(path, log, _thresholds(), real_time=True)
+    _run_clip(path, log, _thresholds(), paced=True)
 
     opened = _blinds(log, BlindReason.FIDUCIAL_MISSING, BlindState.OPENED)
     assert len(opened) == 1
     assert opened[0].evidence["found"] is False
     assert opened[0].evidence["missing_seconds"] >= _thresholds().fiducial["window_s"]
+
+
+class _StallingSource(FrameSource):
+    """A clip whose read at ``stall_at`` blocks first: a loaded CI runner's stall."""
+
+    def __init__(self, path, stall_at: int, stall_s: float) -> None:
+        super().__init__(str(path))
+        self._n = 0
+        self._stall_at = stall_at
+        self._stall_s = stall_s
+
+    def read(self):
+        if self._n == self._stall_at:
+            time.sleep(self._stall_s)
+        self._n += 1
+        return super().read()
+
+
+def test_paced_replay_window_survives_a_wall_clock_stall(tmp_path):
+    # A 0.7 s stall as the marker vanishes once squeezed the 11 hidden frames
+    # into ~36 ms of capture_mono -- under the 50 ms window -- so nothing opened.
+    path = write_synth_clip(
+        tmp_path / "st", frames=30, hide_marker_from=5, hide_marker_until=16, fps=20, seed=9
+    )
+    log = Log(tmp_path / "st.db")
+    source = _StallingSource(path, stall_at=5, stall_s=0.7)
+    _run_clip(path, log, _thresholds(), paced=True, source=source)
+    _open_and_clear(log, BlindReason.FIDUCIAL_MISSING)
 
 
 # --- view_shifted (AC2 proving) ---------------------------------------------
@@ -135,7 +185,7 @@ def test_shifted_marker_opens_a_view_shifted_record(tmp_path):
         tmp_path / "shift", frames=20, marker_move_from=4, marker_move_px=30, fps=20, seed=6
     )
     log = Log(tmp_path / "shift.db")
-    _run_clip(path, log, _thresholds(), real_time=True)
+    _run_clip(path, log, _thresholds(), paced=True)
 
     opened = _blinds(log, BlindReason.VIEW_SHIFTED, BlindState.OPENED)
     assert len(opened) == 1
@@ -165,7 +215,7 @@ def test_frozen_opens_then_clears_after_recovery(tmp_path):
 def test_dark_opens_then_clears_after_recovery(tmp_path):
     path = write_synth_clip(tmp_path / "dk", frames=30, dark_from=5, dark_until=16, fps=20, seed=8)
     log = Log(tmp_path / "dk.db")
-    _run_clip(path, log, _thresholds(), real_time=True)
+    _run_clip(path, log, _thresholds(), paced=True)
     _open_and_clear(log, BlindReason.DARK)
 
 
@@ -174,7 +224,7 @@ def test_fiducial_missing_opens_then_clears_after_recovery(tmp_path):
         tmp_path / "fm", frames=30, hide_marker_from=5, hide_marker_until=16, fps=20, seed=9
     )
     log = Log(tmp_path / "fm.db")
-    _run_clip(path, log, _thresholds(), real_time=True)
+    _run_clip(path, log, _thresholds(), paced=True)
     _open_and_clear(log, BlindReason.FIDUCIAL_MISSING)
 
 
@@ -189,7 +239,7 @@ def test_view_shifted_opens_then_clears_after_recovery(tmp_path):
         seed=10,
     )
     log = Log(tmp_path / "vs.db")
-    _run_clip(path, log, _thresholds(), real_time=True)
+    _run_clip(path, log, _thresholds(), paced=True)
     _open_and_clear(log, BlindReason.VIEW_SHIFTED)
 
 

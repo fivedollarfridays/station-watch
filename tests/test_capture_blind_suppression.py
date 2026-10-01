@@ -4,7 +4,7 @@ When the scene goes dark the marker vanishes with it, but the camera has one
 problem, not two: ``dark`` opens and ``fiducial_missing`` must not. And a frame
 where the marker cannot be found says nothing about whether the view is still
 shifted, so it must not count toward clearing ``view_shifted``. Both run a
-synthetic clip through the real ``Capture.run`` in real time.
+synthetic clip through the real ``Capture.run`` paced at the clip fps on a fake clock.
 """
 
 import sys
@@ -23,7 +23,7 @@ def test_dark_scene_opens_dark_only_not_fiducial_missing(tmp_path):
     log = Log(tmp_path / "dark.db")
     # The fiducial window is *shorter* than the dark window, so without the
     # suppression the missing marker would trip first.
-    _run_clip(path, log, _thresholds(dark_window_s=0.3), real_time=True)
+    _run_clip(path, log, _thresholds(dark_window_s=0.3), paced=True)
 
     assert len(_blinds(log, BlindReason.DARK, BlindState.OPENED)) == 1
     assert len(_blinds(log, BlindReason.DARK, BlindState.CLEARED)) == 1
@@ -41,7 +41,7 @@ def test_missing_marker_does_not_count_toward_clearing_view_shifted(tmp_path):
         seed=10,
     )
     log = Log(tmp_path / "vs.db")
-    _run_clip(path, log, _thresholds(), real_time=True)
+    _run_clip(path, log, _thresholds(), paced=True)
 
     assert len(_blinds(log, BlindReason.VIEW_SHIFTED, BlindState.OPENED)) == 1
     assert _blinds(log, BlindReason.VIEW_SHIFTED, BlindState.CLEARED) == []
