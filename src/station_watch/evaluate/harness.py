@@ -12,7 +12,6 @@ takes the same path over a set generated at run time and tagged
 
 from __future__ import annotations
 
-import json
 import sys
 import tempfile
 from pathlib import Path
@@ -27,7 +26,12 @@ from station_watch.evaluate.manifest import (
     sha256_file,
 )
 from station_watch.evaluate.metrics import assemble_metrics
-from station_watch.evaluate.provenance import BASELINE_DETECTOR, DETECTOR, build_provenance
+from station_watch.evaluate.provenance import (
+    BASELINE_DETECTOR,
+    DETECTOR,
+    build_provenance,
+    write_measurement,
+)
 from station_watch.evaluate.synthetic import SPEED, build_synthetic_set
 from station_watch.runner.startup import load_config
 from station_watch.steps import step_durations, step_stats, write_step_times
@@ -37,8 +41,7 @@ EXIT_MISSING_CLIP = 4
 
 
 def _write_json(path: Path, provenance: dict, metrics: dict) -> None:
-    payload = {"provenance": provenance, "metrics": metrics}
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    write_measurement(path, provenance, metrics)
 
 
 def _run_clips(config, manifest, work_dir: Path, speed: float, backends):

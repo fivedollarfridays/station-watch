@@ -11,11 +11,25 @@ performance.
 
 from __future__ import annotations
 
+import json
 import subprocess
 from datetime import UTC, datetime
+from pathlib import Path
 
 DETECTOR = "station_watch.detect:real-pipeline:v1"
 BASELINE_DETECTOR = "frame_diff_baseline:v1"
+
+
+def write_measurement(path: str | Path, provenance: dict, metrics: dict) -> None:
+    """Write one measurement file in the one format: ``{provenance, metrics}``.
+
+    The single writer every measurement file goes through (the evaluate harness and
+    the fault drill both call it), so there is never a second on-disk shape for the
+    claims test to chase -- metric keys stay addressable as dotted paths under
+    ``metrics``.
+    """
+    payload = {"provenance": provenance, "metrics": metrics}
+    Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 def git_commit() -> str:
@@ -56,4 +70,10 @@ def build_provenance(
     }
 
 
-__all__ = ["DETECTOR", "BASELINE_DETECTOR", "git_commit", "build_provenance"]
+__all__ = [
+    "DETECTOR",
+    "BASELINE_DETECTOR",
+    "git_commit",
+    "build_provenance",
+    "write_measurement",
+]

@@ -1,0 +1,109 @@
+{
+  "metrics": {
+    "faults": {
+      "bumped": {
+        "alarm": "unobservable:view_shifted",
+        "alarm_count": 1,
+        "blind_reason": "view_shifted",
+        "cleared_ts": "2026-10-01T12:51:32.045450+00:00",
+        "exactly_one_alarm": true,
+        "exactly_one_recovery": true,
+        "expected_reason": [
+          "view_shifted",
+          "fiducial_missing"
+        ],
+        "injected_ts": "2026-10-01T12:51:31.045450+00:00",
+        "reason_matches": true,
+        "recovery_count": 1,
+        "time_to_alarm_s": 0.2,
+        "time_to_recovery_s": 0.15
+      },
+      "cable_pulled": {
+        "alarm": "unobservable:disconnected",
+        "alarm_count": 1,
+        "blind_reason": "disconnected",
+        "cleared_ts": "2026-10-01T12:51:34.245450+00:00",
+        "exactly_one_alarm": true,
+        "exactly_one_recovery": true,
+        "expected_reason": [
+          "disconnected"
+        ],
+        "injected_ts": "2026-10-01T12:51:33.245450+00:00",
+        "reason_matches": true,
+        "recovery_count": 1,
+        "time_to_alarm_s": 0.037701,
+        "time_to_recovery_s": 0.85
+      },
+      "frozen": {
+        "alarm": "unobservable:frozen",
+        "alarm_count": 1,
+        "blind_reason": "frozen",
+        "cleared_ts": "2026-10-01T12:51:29.845450+00:00",
+        "exactly_one_alarm": true,
+        "exactly_one_recovery": true,
+        "expected_reason": [
+          "frozen"
+        ],
+        "injected_ts": "2026-10-01T12:51:28.845450+00:00",
+        "reason_matches": true,
+        "recovery_count": 1,
+        "time_to_alarm_s": 0.15,
+        "time_to_recovery_s": 0.15
+      },
+      "lens_covered": {
+        "alarm": "unobservable:dark",
+        "alarm_count": 1,
+        "blind_reason": "dark",
+        "cleared_ts": "2026-10-01T12:51:27.645450+00:00",
+        "exactly_one_alarm": true,
+        "exactly_one_recovery": true,
+        "expected_reason": [
+          "dark"
+        ],
+        "injected_ts": "2026-10-01T12:51:26.645450+00:00",
+        "reason_matches": true,
+        "recovery_count": 1,
+        "time_to_alarm_s": 0.3,
+        "time_to_recovery_s": 0.2
+      },
+      "lights_off": {
+        "alarm": "unobservable:dark",
+        "alarm_count": 1,
+        "blind_reason": "dark",
+        "cleared_ts": "2026-10-01T12:51:36.445450+00:00",
+        "exactly_one_alarm": true,
+        "exactly_one_recovery": true,
+        "expected_reason": [
+          "dark"
+        ],
+        "injected_ts": "2026-10-01T12:51:35.445450+00:00",
+        "reason_matches": true,
+        "recovery_count": 1,
+        "time_to_alarm_s": 0.3,
+        "time_to_recovery_s": 0.15
+      }
+    },
+    "thresholds": {
+      "cycle_interval_s": 0.05,
+      "dark_luma_threshold": 15.0,
+      "dark_window_s": 0.3,
+      "fiducial_tolerance_px": 10,
+      "fiducial_window_s": 0.2,
+      "frozen_frames": 5,
+      "liveness_window_s": 1.0,
+      "recover_good_frames": 3,
+      "recover_healthy_verdicts": 2
+    }
+  },
+  "provenance": {
+    "clips": 0,
+    "config_sha256": "ef33539e2073f9ff5531a851787cf314b62bab1987bbbfe7139daa1038cbd1fc",
+    "dataset": "drill:drill-schedule",
+    "dataset_kind": "synthetic",
+    "date_utc": "2026-10-01",
+    "detector": "station_watch.detect:real-pipeline:v1",
+    "git_commit": "c382d7e8b78148830d4eb93757475e0903af255e",
+    "manifest_sha256": "b7af3be67fceec8bd5b9755ea363b202e69463644f97a13f7e3cde59adca2002",
+    "sessions": []
+  }
+}

@@ -46,3 +46,29 @@ def test_runner_clock_reaches_capture_frame_timestamps(tmp_path):
 
     assert frames, "Capture must have written frame records"
     assert all(f.ts == FAKE_TS for f in frames), "every frame ts must come from the runner's clock"
+
+
+def test_runner_monotonic_reaches_capture_mono(tmp_path):
+    # The synthetic drill runs the pipeline on a frame-index clock; Capture's
+    # ``capture_mono`` (and its liveness timer) must come from that same clock, or a
+    # wall-clock stall would read as a disconnect the drill never injected.
+    import itertools
+
+    clip = write_synth_clip(tmp_path / "clip", frames=12, fps=50.0)
+    config_path = tmp_path / "station.yaml"
+    config_path.write_text(yaml.safe_dump({**HEALTH_CONFIG, "liveness_window_s": 0.5}))
+    logdb = tmp_path / "log.db"
+    context = build_context(
+        config_path=str(config_path),
+        source_spec=str(clip),
+        log_path=str(logdb),
+        alarm_record=str(tmp_path / "alarm.jsonl"),
+    )
+    ticks = itertools.count(5000.0, 0.001)
+    runner = Runner(context, run_id="run-mono-test", monotonic=lambda: next(ticks))
+    runner.run()
+
+    with Log(logdb) as log:
+        frames = log.since(EPOCH, ["frame"])
+    assert frames, "Capture must have written frame records"
+    assert all(f.capture_mono >= 5000.0 for f in frames), "capture_mono comes from the runner"

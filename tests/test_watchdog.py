@@ -10,6 +10,7 @@ spy sink; the two-subprocess proving drill lives in ``test_watchdog_proving.py``
 """
 
 import ast
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -268,7 +269,7 @@ def _internal_import_targets(file: Path) -> set[str]:
     return targets
 
 
-def test_every_module_is_reached_from_the_run_or_watchdog_entry_points():
+def test_every_module_is_reached_from_a_run_watchdog_drill_measure_or_board_entry():
     pkg = Path(__file__).resolve().parent.parent / "src" / "station_watch"
     files = [f for f in pkg.rglob("*.py") if "__pycache__" not in f.parts]
     modules = {_module_name(pkg, f): f for f in files}
@@ -278,10 +279,12 @@ def test_every_module_is_reached_from_the_run_or_watchdog_entry_points():
         return {".".join(parts[: i + 1]) for i in range(len(parts))}
 
     # Roots: the package itself (its __init__ runs on any import) and the
-    # `python -m station_watch` / console-script entry, which reaches both the
-    # `run` and `watchdog` subcommands through the CLI.
+    # `python -m station_watch` / console-script entry, which reaches every
+    # subcommand through `cli.build_parser`/`main` -- the `run` and `watchdog`
+    # paths, the HF3A `drill`, `measure` and `board` paths, and the evaluate /
+    # fetch-model paths beside them. A module no command imports is dead code.
     reached: set[str] = set()
-    frontier = {"station_watch", "station_watch.__main__"}
+    frontier = {"station_watch", "station_watch.__main__", "station_watch.cli"}
     while frontier:
         name = frontier.pop()
         if name in reached or name not in modules:
@@ -292,8 +295,17 @@ def test_every_module_is_reached_from_the_run_or_watchdog_entry_points():
                 if ancestor in modules and ancestor not in reached:
                     frontier.add(ancestor)
 
+    # The HF3A entry points and their module trees are part of the live command
+    # surface, not dead code: each must be reachable from the CLI (HF3A.7).
+    for entry in (
+        "station_watch.drill.commandline",
+        "station_watch.physics.commandline",
+        "station_watch.board.commandline",
+    ):
+        assert entry in reached, f"{entry} entry point is not reached from the CLI"
+
     orphans = sorted(set(modules) - reached)
-    assert orphans == [], f"modules not imported by the run/watchdog path: {orphans}"
+    assert orphans == [], f"modules not reached from a CLI subcommand entry point: {orphans}"
 
 
 # --- AC5: the README "Run it" commands are real station-watch invocations -----
@@ -327,6 +339,50 @@ def test_readme_run_it_commands_parse_against_the_real_cli():
     assert "pip install" in section
     assert any("--source 0" in c for c in commands)
     assert any("watchdog" in c for c in commands)
+    # HF3A subcommands are shown too: drill (synthetic and live), measure, board.
+    assert any(c.startswith("station-watch drill") and "--schedule" in c for c in commands)
+    assert any(c.startswith("station-watch drill") and "--live" in c for c in commands)
+    assert any(c.startswith("station-watch measure ") for c in commands)
+    assert any(c.startswith("station-watch board") for c in commands)
+
+
+# --- AC3: no footage, images, binary video or weights are tracked -------------
+
+
+def test_no_footage_images_or_weights_are_tracked_by_git():
+    # Footage never leaves the box and weights are fetched locally, never
+    # committed; sample images and other binary blobs stay out of the public repo
+    # too. The committed clip *manifests* are YAML/JSONL, not video, so this scans
+    # only for the binary suffixes the .gitignore keeps out (HF3A.7).
+    root = Path(__file__).resolve().parent.parent
+    tracked = subprocess.run(
+        ["git", "ls-files"], cwd=root, capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    binary_suffixes = (
+        # footage / video
+        ".mp4",
+        ".mkv",
+        ".mov",
+        ".avi",
+        ".webm",
+        # images
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".bmp",
+        ".tiff",
+        # model weights
+        ".onnx",
+        ".pt",
+        ".pth",
+        ".tflite",
+        ".pb",
+        ".h5",
+        ".weights",
+    )
+    offenders = [f for f in tracked if f.lower().endswith(binary_suffixes)]
+    assert offenders == [], f"footage, images or weights must never be committed: {offenders}"
 
 
 def test_readme_status_and_principles_sections_are_unchanged():
