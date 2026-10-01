@@ -104,6 +104,8 @@ Exposes (consumed by HF2.4, HF2.6, HF2.7): `src/station_watch/detect/detector.py
 - [ ] A detector that raises on one frame produces `part_unknown` with cause `detect_error` for every position, Capture keeps writing frames, and no `disconnected` BlindRecord is written (test)
 - [ ] `--observations` together with Detect targets in the config exits non-zero naming the conflict (test)
 - [ ] The HF1.8 orphan test passes with every new `detect` module reached from the run path
+- [ ] **Counterparty:** `src/station_watch/judge.py::Judge` consumes the Observation rows Detect appends to the Log (named artifact; Judge reads them through `JudgeInputs`, no side channel)
+- [ ] **E2E Conformance:** a real `station-watch run` subprocess on a synthetic rail clip produces Detect rows and a Judge verdict citing them, both read back from the Log the run wrote (not a unit test of either side)
 
 **Interface:** From HF2.2: `PositionTracker(config, run_id)`, `update(frame, frame_id, ts, corners) -> list[Observation]`, `unknown_all(frame_id, ts, cause, detail) -> list[Observation]`. Log appends go through `Log.append(record)` (HF1.2, idempotent on `record_id`, one serialized writer per process). The runner already loads fixtures with `load_fixture_observations(path, run_start_ts, run_id)` (HF1.1).
 
@@ -118,13 +120,15 @@ Exposes (consumed by HF2.4, HF2.6, HF2.7): `src/station_watch/detect/detector.py
 
 **Description:** Add the motion half of Detect: for the configured `station_zone`, compute frame-to-frame change inside the zone polygon (mapped through the marker) and emit `motion` / `no_motion` with N-frame persistence. Calibrate against sensor noise: the threshold sits above the zone's measured noise floor (HF1's noise score idea), so a live still scene reads `no_motion`, never `motion`. Unknown frames (marker missing, dark) emit nothing for the zone, so Judge's existing blind handling governs. Then make the stall threshold come from **measured step times**: add `src/station_watch/steps.py` with `step_durations(observations)` (a step is a contiguous `motion` run in the station zone, bounded by `no_motion`) and `step_stats(durations)` (count, p50, p95). The Judge's stall window becomes `p95 + grace_s` when the config's `detect.step_times_path` points at an existing measurement file (written by HF2.8), else `takt_s + grace_s`. The runner prints at startup which threshold is in use and where it came from, for example `stall threshold 35.0 s (configured takt; no measured step times)`; a configured path that does not exist fails loud (K9).
 
-Exposes (consumed by HF2.5 and HF2.8): `steps.step_durations(observations) -> list[Step]` where `Step` is a frozen dataclass `(target, start_frame_id, end_frame_id, start_ts, end_ts, duration_s)`; `steps.step_stats(durations) -> dict` with `count`, `p50_s`, `p95_s`; the `step_times.json` schema `{"provenance": {...}, "metrics": {"count": int, "p50_s": float, "p95_s": float}}`, which HF2.4 reads and HF2.8 writes; `MotionTracker` following the HF2.3 tracker protocol.
+Exposes (consumed by HF2.5 and HF2.8): `steps.step_durations(observations) -> list[Step]` where `Step` is a frozen dataclass `(target, start_frame_id, end_frame_id, start_ts, end_ts, duration_s)`; `steps.step_stats(durations) -> dict` with `count`, `p50_s`, `p95_s`; `steps.write_step_times(path, stats, provenance)`; the `step_times.json` schema `{"provenance": {...}, "metrics": {"count": int, "p50_s": float, "p95_s": float}}`, which HF2.4 reads and HF2.8 writes; `MotionTracker` following the HF2.3 tracker protocol.
 
 **AC:**
 - [ ] Proving test: a synthetic clip with periodic tool motion in the station zone, then a still period longer than the window, run through real Capture and Detect, yields `stalled` only after the window, citing the still frames
 - [ ] A still-but-live (noise only) zone reads `no_motion`; a frozen feed is caught by Capture's `frozen` record and Judge says `unobservable`, never `stalled` (test)
 - [ ] `step_durations` and `step_stats` are correct on hand-built observation sequences (test)
 - [ ] With a step-times measurement file present, the stall window equals its p95 plus grace; absent path key, the window is `takt_s + grace_s`; a configured path that does not exist refuses to start naming it; the startup line states the source (tests)
+- [ ] **Counterparty:** `src/station_watch/steps.py::write_step_times(path, stats, provenance)` is the producer of `step_times.json` (HF2.8 calls it), and the runner's startup is its consumer (named artifacts)
+- [ ] **E2E Conformance:** a real `station-watch run` on a normal synthetic clip, then `write_step_times` over the steps read from that run's Log, then a second real `station-watch run` with `detect.step_times_path` set prints the measured source at startup and stalls at p95 plus grace
 
 **Closes on Kevin's clips (not an engage AC):** real p95 step time from normal cycles in clip set v1; stall flags checked on the labeled stall clips.
 
@@ -204,6 +208,7 @@ Exposes (consumed by HF2.9): every measurement file is JSON `{"provenance": {"da
 - [ ] Every measurement file carries the provenance fields above (test); synthetic files carry `dataset_kind: synthetic`
 - [ ] The baseline is computed on the same clips and written beside the main numbers (test)
 - [ ] `measurements/synthetic/` files are committed; `station-watch evaluate` is reached by the orphan test's roots
+- [ ] **E2E Conformance:** a real `station-watch evaluate --synthetic` subprocess writes `step_times.json`, and a real `station-watch run` subprocess with `detect.step_times_path` pointing at it prints the measured threshold source at startup (producer and consumer both on the real CLI path)
 
 **Closes on Kevin's clips (not an engage AC):** the first real precision, recall and latency numbers on clip set v1 (`measurements/v1/`), the real `step_times.json`, and per-session results once a second session exists.
 
