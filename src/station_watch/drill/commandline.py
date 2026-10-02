@@ -11,6 +11,7 @@ schedule, or a live run with no source, never limps along.
 
 from __future__ import annotations
 
+import shlex
 import sys
 
 DEFAULT_FPS = 20.0
@@ -62,7 +63,7 @@ def _command(args) -> str:
         parts += ["--live", "--source", str(args.source)]
     else:
         parts += ["--schedule", args.schedule]
-    return " ".join(parts)
+    return shlex.join(parts)  # quote paths with spaces/$ so the string re-parses exactly
 
 
 def handle(args) -> int:

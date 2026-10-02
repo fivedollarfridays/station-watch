@@ -82,11 +82,17 @@ class Detector:
         """Compose one more tracker into the per-frame fan-out."""
         self._trackers.append(tracker)
 
-    def process(self, frame, frame_id: int, ts: str) -> list[Observation]:
-        """Find the marker once and let every tracker read this frame."""
-        corners = find_marker_corners(
-            frame, self._fiducial["dictionary_id"], self._fiducial["marker_id"]
-        )
+    def process(self, frame, frame_id: int, ts: str, corners=None) -> list[Observation]:
+        """Let every tracker read this frame, finding the marker only if not given.
+
+        Capture finds the corners once per frame and passes them in; a caller
+        without them (the physics scripts) leaves ``corners=None`` and the Detector
+        searches itself -- so the marker is never detected twice on the live path.
+        """
+        if corners is None:
+            corners = find_marker_corners(
+                frame, self._fiducial["dictionary_id"], self._fiducial["marker_id"]
+            )
         out: list[Observation] = []
         for tracker in self._trackers:
             out.extend(tracker.update(frame, frame_id, ts, corners))

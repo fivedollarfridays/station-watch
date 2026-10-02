@@ -43,6 +43,19 @@ def find_marker_corners(frame: np.ndarray, dictionary_id: str, marker_id: int) -
     return None
 
 
+def marker_center(corners: np.ndarray | None) -> tuple[float, float] | None:
+    """Pixel center ``(x, y)`` of a marker from its four ``corners``, or ``None``.
+
+    The center is the centroid of the corners :func:`find_marker_corners` returns,
+    so Capture can find the marker once per frame and derive both its center (for
+    the blind-condition watch) and the corners (for Detect) from one search.
+    """
+    if corners is None:
+        return None
+    center = np.asarray(corners, dtype=np.float32).reshape(4, 2).mean(axis=0)
+    return float(center[0]), float(center[1])
+
+
 def region_to_pixels(region, corners: np.ndarray | None) -> np.ndarray | None:
     """Map a marker-unit ``region`` to a pixel polygon through the marker ``corners``.
 
@@ -63,4 +76,4 @@ def region_to_pixels(region, corners: np.ndarray | None) -> np.ndarray | None:
     return np.rint(pixels).astype(np.int32)
 
 
-__all__ = ["find_marker_corners", "region_to_pixels"]
+__all__ = ["find_marker_corners", "marker_center", "region_to_pixels"]

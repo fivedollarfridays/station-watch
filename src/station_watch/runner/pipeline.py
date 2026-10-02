@@ -80,11 +80,13 @@ class Runner:
         self._stop = threading.Event()
         self._capture_error: BaseException | None = None
         self._capture_exit_reported = False
-        self._stall_window_s = context.stall_window_s
         self._stall_window_source = context.stall_window_source
         self._judge = Judge(
             self._config, run_id=run_id, clock=clock, stall_window_s=context.stall_window_s
         )
+        # The effective window the Judge resolved (a context with no window falls
+        # back to takt_s + grace_s); used for the startup banner below.
+        self._stall_window_s = self._judge._stall_window
         self._alarm = Alarm(self._config, run_id=run_id, sinks=context.sinks, clock=clock)
 
     def stop(self) -> None:

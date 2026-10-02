@@ -58,11 +58,16 @@ class Occlusion:
 
     def measure(self, clips, config, backend_factory) -> dict:
         """Run Detect per angle over ``clips``; return the occlusion metrics block."""
+        from station_watch.evaluate.manifest import ManifestError
+
         dense = replace(config, detect={**config.detect, "emit_interval_s": 0.0})
         by_angle: dict[str, list] = {}
         for clip in clips:
             frames = _read_frames(clip.clip_path)
-            native = _native_fps(clip)
+            try:
+                native = _native_fps(clip)
+            except ValueError as exc:  # no fps tag and the file reports none: name the clip
+                raise ManifestError(str(exc)) from exc
             per_target = _run_detector(frames, dense, native, backend_factory(clip))
             by_angle.setdefault(str(clip.tags["angle_deg"]), []).append(
                 (clip, len(frames), native, per_target)

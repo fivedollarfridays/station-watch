@@ -167,7 +167,9 @@ def _run_real(config_path, manifest_path, clips_dir, out_dir, speed, split) -> i
         print(f"station-watch: {exc}", file=sys.stderr)
         return EXIT_MISSING_CLIP
     config = load_config(config_path)
-    backend = build_keepout_backend(config)
+    # One backend per clip, as the synthetic path already does: a shared,
+    # possibly-stateful person detector must not carry state between clips.
+    backends = [build_keepout_backend(config) for _ in scored]
     _evaluate(
         config,
         scored,
@@ -177,7 +179,7 @@ def _run_real(config_path, manifest_path, clips_dir, out_dir, speed, split) -> i
         manifest_sha=manifest.sha256,
         config_sha=sha256_file(config_path),
         speed=speed,
-        backends=[backend] * len(scored),
+        backends=backends,
         split=split,
         calibration=calibration,
     )

@@ -42,7 +42,9 @@ class RunContext:
     sinks: list[Sink]
     thresholds: BlindThresholds
     keepout_backend: object | None = None
-    stall_window_s: float = 0.0
+    # None, not 0.0: a context built without a resolved window lets the Judge fall
+    # back to ``takt_s + grace_s`` rather than silently judging on a 0 s window.
+    stall_window_s: float | None = None
     stall_window_source: str = ""
 
 

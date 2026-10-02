@@ -36,7 +36,6 @@ from collections.abc import Callable, Iterator
 import numpy as np
 
 from station_watch.capture.blind import BlindThresholds, BlindWatch
-from station_watch.capture.fiducial import find_marker_center
 from station_watch.capture.metrics import fingerprint, mean_luma, noise_score
 from station_watch.capture.resilience import (
     DetectStep,
@@ -48,6 +47,7 @@ from station_watch.capture.resilience import (
 from station_watch.capture.source import FrameSource
 from station_watch.clock import utc_now_iso
 from station_watch.detect.detector import Detector
+from station_watch.detect.geometry import find_marker_corners, marker_center
 from station_watch.records import FrameRecord
 
 _MONO_EPSILON = 1e-9
@@ -212,10 +212,12 @@ class Capture:
         record = self._record(frame, frame_id, mono)
         log.append(record)
         self.first_frame.set()
-        center = find_marker_center(frame, fiducial["dictionary_id"], fiducial["marker_id"])
-        watch.observe_frame(record, center)
+        # Find the marker once per frame; derive the blind-watch center from its
+        # corners and hand the same corners to Detect (K12, no double detection).
+        corners = find_marker_corners(frame, fiducial["dictionary_id"], fiducial["marker_id"])
+        watch.observe_frame(record, marker_center(corners))
         if self._detect is not None:
-            self._detect(log, frame, record.frame_id, record.ts)
+            self._detect(log, frame, record.frame_id, record.ts, corners)
 
     def _frame_failed(self, watch: BlindWatch, exc: Exception, frame_id: int) -> None:
         """Record a per-frame processing error as ``disconnected``; report it once."""

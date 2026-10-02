@@ -68,13 +68,16 @@ class DetectStep:
         self._detector = detector
         self._error_reported = False
 
-    def __call__(self, log, frame: np.ndarray, frame_id: int, ts: str) -> None:
+    def __call__(self, log, frame: np.ndarray, frame_id: int, ts: str, corners) -> None:
         """A Detect exception must not kill Capture and must not look disconnected:
         every target reads ``part_unknown`` with cause ``detect_error`` and the
         error text, reported once per episode (a later clean read ends it).
+
+        ``corners`` are the marker corners Capture already found this frame, passed
+        through so Detect never searches for the marker a second time.
         """
         try:
-            observations = self._detector.process(frame, frame_id, ts)
+            observations = self._detector.process(frame, frame_id, ts, corners)
             self._error_reported = False
         except Exception as exc:  # a Detect fault is unknown, never a false disconnect
             detail = error_detail(exc)

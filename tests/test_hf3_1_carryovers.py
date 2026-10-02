@@ -130,7 +130,7 @@ def test_capture_finds_marker_once_per_frame(tmp_path, monkeypatch):
 def test_run_context_without_stall_window_uses_takt_plus_grace():
     config = StationConfig.from_mapping(_config_dict())
     context = RunContext(
-        config=config, source=object(), log=object(), sinks=[], thresholds=object()
+        config=config, source=object(), log=object(), sinks=[object()], thresholds=object()
     )
     assert context.stall_window_s is None, "an un-set stall window is None, not a real 0.0 s"
 
