@@ -27,6 +27,10 @@ REQUEST_TIMEOUT_S = 10.0
 NONCE_BYTES = 16
 
 
+# A verdict body is a flag id, a verdict and a short note: a few hundred bytes.
+MAX_BODY_BYTES = 64 * 1024
+
+
 class ReviewHandler(BaseHTTPRequestHandler):
     """Serves the review page and records verdicts; one marking endpoint, loopback only."""
 
@@ -83,7 +87,13 @@ class ReviewHandler(BaseHTTPRequestHandler):
         if not guards.json_content_type(self.headers.get("Content-Type")):
             self._json(415, {"ok": False, "error": "content-type must be application/json"})
             return
-        length = int(self.headers.get("Content-Length") or 0)
+        length = guards.content_length(self.headers.get("Content-Length"))
+        if length is None:
+            self._json(400, {"ok": False, "error": "bad Content-Length"})
+            return
+        if length > MAX_BODY_BYTES:
+            self._json(413, {"ok": False, "error": f"body over {MAX_BODY_BYTES} bytes"})
+            return
         raw = self.rfile.read(length) if length > 0 else b""
         data = guards.parse_json_body(raw)
         if data is None:
@@ -95,7 +105,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
         flag_id = data.get("flag_id")
         verdict = data.get("verdict")
         note = data.get("note") or ""
-        if flag_id not in self.server.flag_ids:
+        if not isinstance(flag_id, str) or flag_id not in self.server.flag_ids:
             self._json(400, {"ok": False, "error": f"unknown flag_id {flag_id!r}"})
             return
         if verdict not in VALID_VERDICTS:
@@ -172,4 +182,4 @@ def make_review_server(
     return server
 
 
-__all__ = ["ReviewHandler", "make_review_server", "REQUEST_TIMEOUT_S"]
+__all__ = ["ReviewHandler", "make_review_server", "REQUEST_TIMEOUT_S", "MAX_BODY_BYTES"]

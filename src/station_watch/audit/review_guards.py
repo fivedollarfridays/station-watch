@@ -74,6 +74,17 @@ def csp_header(nonce: str) -> str:
     return _CSP.format(nonce=nonce)
 
 
+def content_length(header: str | None) -> int | None:
+    """The request's Content-Length as a non-negative int, or None when malformed."""
+    if header is None or header.strip() == "":
+        return 0
+    try:
+        length = int(header)
+    except ValueError:
+        return None
+    return length if length >= 0 else None
+
+
 def parse_json_body(raw: bytes) -> dict | None:
     """Decode a request body into a JSON object, or ``None`` if it is not one."""
     try:
@@ -84,6 +95,7 @@ def parse_json_body(raw: bytes) -> dict | None:
 
 
 __all__ = [
+    "content_length",
     "LOOPBACK",
     "TOKEN_COOKIE",
     "TOKEN_HEADER",
