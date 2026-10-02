@@ -94,3 +94,11 @@ detect:
     min_overlap: 0.1             # fraction of a person box inside a zone to count as entry
     persistence_frames: 3        # consecutive agreeing frames before person_in_keepout/zone_clear
     # model_path: data/local/models/yolox_nano.onnx   # default; override to relocate the weights
+
+# Session QA (HF3.3): the per-session unknown budget `station-watch qa` holds a
+# finished session's Log to. Optional and read only by `qa` -- `station-watch run`
+# ignores this section entirely. `qa` refuses to start without max_unknown_fraction,
+# naming the dotted key (K9), so uncomment and set it before scoring a session.
+# qa:
+#   max_unknown_fraction: 0.2          # most unobservable (blind + gap) time a passing session may hold
+#   max_target_unknown_fraction: 0.2   # optional: most part_unknown/zone_unknown time per slot/zone

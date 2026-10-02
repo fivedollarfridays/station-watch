@@ -13,11 +13,46 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 DETECTOR = "station_watch.detect:real-pipeline:v1"
 BASELINE_DETECTOR = "frame_diff_baseline:v1"
+
+# Each dataset kind owns its measurement subtree: a synthetic (proving) number can
+# never be written where a real number lives, and vice versa.
+_CONFINE_DIRS = {
+    "synthetic": ("measurements/synthetic",),
+    "real": ("measurements/v1", "measurements/v2"),
+}
+
+
+def confine_out(out: Path, dataset_kind: str, *, force_out: bool = False) -> Path:
+    """Resolve ``out`` only if it lands in ``dataset_kind``'s own measurement tree.
+
+    The returned path is fully resolved (``..`` normalized, symlinks followed), so a
+    ``..`` segment or a symlink that escapes the allowed tree is caught here rather
+    than silently writing elsewhere. A disallowed path raises ``ValueError`` naming
+    the rule; ``force_out`` overrides it with one warning line on stderr.
+    """
+    bases = _CONFINE_DIRS.get(dataset_kind)
+    if bases is None:
+        raise ValueError(
+            f"unknown dataset_kind {dataset_kind!r}; expected one of {sorted(_CONFINE_DIRS)}"
+        )
+    resolved = Path(out).resolve()
+    allowed = [Path(base).resolve() for base in bases]
+    if any(resolved == base or base in resolved.parents for base in allowed):
+        return resolved
+    rule = (
+        f"a {dataset_kind} measurement must be written inside "
+        f"{' or '.join(base + '/' for base in bases)}"
+    )
+    if force_out:
+        sys.stderr.write(f"station-watch: WARNING: --force-out writes {resolved} outside {rule}\n")
+        return resolved
+    raise ValueError(f"refusing to write {resolved}: {rule}")
 
 
 def write_measurement(path: str | Path, provenance: dict, metrics: dict) -> None:
@@ -95,4 +130,5 @@ __all__ = [
     "git_commit",
     "build_provenance",
     "write_measurement",
+    "confine_out",
 ]

@@ -25,18 +25,20 @@ def build_parser() -> argparse.ArgumentParser:
     _add_run_parser(sub)
     _add_watchdog_parser(sub)
     _add_fetch_model_parser(sub)
-    # The evaluate/board/drill/measure subcommands keep their arg wiring in a sibling
-    # `commandline` module, imported here so the parser knows them but the heavy work
-    # (OpenCV, renderers) stays deferred to each module's `handle`.
+    # The evaluate/board/drill/measure/qa subcommands keep their arg wiring beside their
+    # own logic, imported here so the parser knows them but the heavy work (OpenCV,
+    # renderers, the Log walk) stays deferred to each module's `handle`.
     from station_watch.board.commandline import add_parser as add_board_parser
     from station_watch.drill.commandline import add_parser as add_drill_parser
     from station_watch.evaluate.commandline import add_parser as add_evaluate_parser
     from station_watch.physics.commandline import add_parser as add_measure_parser
+    from station_watch.qa import add_parser as add_qa_parser
 
     add_evaluate_parser(sub)
     add_board_parser(sub)
     add_drill_parser(sub)
     add_measure_parser(sub)
+    add_qa_parser(sub)
     return parser
 
 
@@ -205,12 +207,14 @@ def main(argv: list[str] | None = None) -> int:
     from station_watch.drill.commandline import handle as drill_handle
     from station_watch.evaluate.commandline import handle as evaluate_handle
     from station_watch.physics.commandline import handle as measure_handle
+    from station_watch.qa import handle as qa_handle
 
     handlers = {
         "evaluate": evaluate_handle,
         "board": board_handle,
         "drill": drill_handle,
         "measure": measure_handle,
+        "qa": qa_handle,
     }
     if args.command in handlers:
         return handlers[args.command](args)

@@ -22,6 +22,8 @@ dimness and partial occlusion (K3), and the raw scores it decided from (K4).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import cv2
 import numpy as np
 
@@ -72,6 +74,65 @@ def _ceiling(
     return round(min(blur_term, dim_term, occ_term), 4)
 
 
+@dataclass(frozen=True)
+class RegionQuality:
+    """The shared unknown-cause read of a pixel region (no method-specific logic).
+
+    ``cause`` is the unknown reason (``out_of_frame`` / ``dark`` / ``blurred`` /
+    ``occluded``) or ``None`` when the region is readable; ``crop`` is the BGR region
+    (``None`` only when ``out_of_frame``); ``ceiling`` is the K3 confidence ceiling and
+    ``scores`` the K4 raw quality scores. Both :func:`read_region` and the detail
+    readers (:mod:`station_watch.detect.details`) decide ``unknown`` from this one
+    helper, so the four gates are never duplicated.
+    """
+
+    cause: str | None
+    crop: np.ndarray | None
+    ceiling: float
+    scores: dict
+
+
+def read_region_quality(frame: np.ndarray, poly: np.ndarray | None, detect: dict) -> RegionQuality:
+    """Read the four unknown-cause gates for the pixel region ``poly`` (shared helper).
+
+    Maps nothing -- ``poly`` is already pixels. A ``None`` poly (no marker) or a bbox
+    that leaves the frame reads ``out_of_frame``; otherwise luma/Laplacian/skin decide
+    ``dark`` / ``blurred`` / ``occluded`` against the station's configured thresholds.
+    """
+    if poly is None:
+        return RegionQuality(CAUSE_OUT_OF_FRAME, None, 0.0, {})
+    x0, y0, x1, y1 = _bbox(poly)
+    frame_h, frame_w = frame.shape[:2]
+    if x0 < 0 or y0 < 0 or x1 > frame_w or y1 > frame_h:
+        return RegionQuality(
+            CAUSE_OUT_OF_FRAME, None, 0.0, {"bbox": [x0, y0, x1, y1], "frame": [frame_w, frame_h]}
+        )
+    reg = frame[y0:y1, x0:x1]
+    gray = cv2.cvtColor(reg, cv2.COLOR_BGR2GRAY)
+    lap_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    mean_luma = float(gray.mean())
+    skin_fraction = float(_skin_mask(reg).mean())
+    blur_thr, dark_thr, occ_thr = (
+        detect["blur_threshold"],
+        detect["darkness_threshold"],
+        detect["occlusion_threshold"],
+    )
+    ceiling = _ceiling(lap_var, mean_luma, skin_fraction, blur_thr, dark_thr)
+    scores = {
+        "lap_var": round(lap_var, 3),
+        "mean_luma": round(mean_luma, 3),
+        "skin_fraction": round(skin_fraction, 4),
+    }
+    cause = None
+    if mean_luma < dark_thr:
+        cause = CAUSE_DARK
+    elif lap_var < blur_thr:
+        cause = CAUSE_BLURRED
+    elif skin_fraction > occ_thr:
+        cause = CAUSE_OCCLUDED
+    return RegionQuality(cause, reg, ceiling, scores)
+
+
 def _seat_offset(frame: np.ndarray, poly: np.ndarray, marker_side: float) -> float:
     """Offset of the component's colored centroid from the seat center, in marker units.
 
@@ -100,43 +161,21 @@ def read_region(
     the unknown reason (or ``None``). No time thresholds -- persistence is the caller's.
     """
     poly = region_to_pixels(region, corners)
-    x0, y0, x1, y1 = _bbox(poly)
-    frame_h, frame_w = frame.shape[:2]
-    if x0 < 0 or y0 < 0 or x1 > frame_w or y1 > frame_h:
-        return (
-            "unknown",
-            CAUSE_OUT_OF_FRAME,
-            0.0,
-            {"bbox": [x0, y0, x1, y1], "frame": [frame_w, frame_h]},
-        )
+    quality = read_region_quality(frame, poly, detect)
+    scores = dict(quality.scores)
+    ceiling = quality.ceiling
+    if quality.cause == CAUSE_OUT_OF_FRAME:
+        return "unknown", CAUSE_OUT_OF_FRAME, 0.0, scores
 
-    reg = frame[y0:y1, x0:x1]
+    reg = quality.crop
     gray = cv2.cvtColor(reg, cv2.COLOR_BGR2GRAY)
-    lap_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-    mean_luma = float(gray.mean())
-    skin_fraction = float(_skin_mask(reg).mean())
     occupied_fraction = float((_colorfulness(reg) > _COLOR_DIFF_MIN).mean())
     edge_density = float((cv2.Canny(gray, 50, 150) > 0).mean())
-    blur_thr, dark_thr, occ_thr = (
-        detect["blur_threshold"],
-        detect["darkness_threshold"],
-        detect["occlusion_threshold"],
-    )
-    ceiling = _ceiling(lap_var, mean_luma, skin_fraction, blur_thr, dark_thr)
-    scores = {
-        "lap_var": round(lap_var, 3),
-        "mean_luma": round(mean_luma, 3),
-        "skin_fraction": round(skin_fraction, 4),
-        "occupied_fraction": round(occupied_fraction, 4),
-        "edge_density": round(edge_density, 4),
-    }
+    scores["occupied_fraction"] = round(occupied_fraction, 4)
+    scores["edge_density"] = round(edge_density, 4)
 
-    if mean_luma < dark_thr:
-        return "unknown", CAUSE_DARK, ceiling, scores
-    if lap_var < blur_thr:
-        return "unknown", CAUSE_BLURRED, ceiling, scores
-    if skin_fraction > occ_thr:
-        return "unknown", CAUSE_OCCLUDED, ceiling, scores
+    if quality.cause is not None:
+        return "unknown", quality.cause, ceiling, scores
     if occupied_fraction < _OCCUPANCY_THRESHOLD:
         return "empty", None, ceiling, scores
 
@@ -152,6 +191,8 @@ def read_region(
 
 __all__ = [
     "read_region",
+    "read_region_quality",
+    "RegionQuality",
     "CAUSE_FIDUCIAL_MISSING",
     "CAUSE_OUT_OF_FRAME",
     "CAUSE_DARK",
