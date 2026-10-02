@@ -9,6 +9,9 @@ lazily inside :func:`handle`.
 prints one PASS/FAIL/WARN/SKIP line per check (or ``--json``), and exits 0 only when no
 check is a FAIL. ``--list-cameras`` is a separate mode that only enumerates the device
 indexes that open (how the operator finds the right ``--source``) and always exits 0.
+``--cold-start`` is the third mode: it launches a real ``run`` and writes how long the
+station took to its first frame, verdict and healthy verdict
+(:mod:`station_watch.preflight.cold_start_report`).
 """
 
 from __future__ import annotations
@@ -58,10 +61,43 @@ def add_parser(sub) -> None:
     preflight.add_argument(
         "--json", action="store_true", dest="as_json", help="print the results as JSON"
     )
+    _add_cold_start_args(preflight)
+
+
+def _add_cold_start_args(preflight) -> None:
+    """``--cold-start``: time a real ``run`` from launch to its first healthy verdict."""
+    preflight.add_argument(
+        "--cold-start",
+        action="store_true",
+        help="launch `station-watch run` and measure launch-to-first frame, verdict and "
+        "healthy verdict; writes a measurement file to --out",
+    )
+    preflight.add_argument("--out", help="--cold-start: measurement file to write")
+    preflight.add_argument(
+        "--dataset-kind",
+        choices=["real", "synthetic"],
+        help="--cold-start: real (a camera) writes under measurements/v1|v2/, synthetic "
+        "(a generated clip) under measurements/synthetic/",
+    )
+    preflight.add_argument(
+        "--force-out",
+        action="store_true",
+        help="--cold-start: write --out outside its dataset kind's tree (prints a warning)",
+    )
+    preflight.add_argument(
+        "--timeout-s",
+        type=float,
+        default=60.0,
+        help="--cold-start: give up with status no_healthy_verdict after this many seconds",
+    )
 
 
 def handle(args) -> int:
     """Run preflight (or --list-cameras) for parsed ``preflight`` ``args``."""
+    if args.cold_start:
+        from station_watch.preflight.cold_start_report import handle_cold_start
+
+        return handle_cold_start(args)
     if args.list_cameras:
         from station_watch.preflight.cameras import probe_cameras, render_camera_list
 

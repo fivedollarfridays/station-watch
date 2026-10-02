@@ -1,0 +1,19 @@
+{
+  "metrics": {
+    "launch_to_first_frame_s": 0.133682,
+    "launch_to_first_healthy_s": 1.146061,
+    "launch_to_first_verdict_s": 1.146061
+  },
+  "provenance": {
+    "clips": 1,
+    "config_sha256": "fc5226df72a430845c599891505412d81c6bdd49ac2f919f59425e296c4c9cb3",
+    "dataset": "cold_start:station-1",
+    "dataset_kind": "synthetic",
+    "date_utc": "2026-10-02",
+    "detector": "station_watch.detect:real-pipeline:v1",
+    "git_commit": "8de17786fee9730e6ad34a3f801295ea6b03833d",
+    "manifest_sha256": "none",
+    "sessions": [],
+    "source": "clip.mkv"
+  }
+}

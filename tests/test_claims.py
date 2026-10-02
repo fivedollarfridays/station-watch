@@ -288,3 +288,36 @@ def test_section_without_held_out_words_fails_when_a_held_out_file_is_committed(
               "#metrics.missing_part.precision round=2 -->0.90\n")
     errors = held_out_claim_errors(tmp_path, readme)
     assert any("held-out" in e for e in errors), errors
+
+
+# --- HF3.17: every number in docs/DEMO.md carries a claim marker ---------------
+#
+# The run-of-show is read aloud on demo day, so its numbers are held to the same
+# rule as the README section. Commands (fenced blocks and inline code) and
+# ordered-list markers are not claims and are stripped first.
+
+DEMO_DOC = ROOT / "docs" / "DEMO.md"
+
+
+def demo_prose(text: str) -> str:
+    """The doc with fenced code, inline code and list markers removed."""
+    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    text = re.sub(r"`[^`\n]*`", " ", text)
+    return re.sub(r"^\s*\d+\.\s", " ", text, flags=re.M)
+
+
+def test_demo_doc_numbers_match_committed_measurements():
+    text = DEMO_DOC.read_text()
+    claims = parse_claims(text)
+    assert any(c.path == "measurements/synthetic/cold_start.json" for c in claims)
+    assert not claim_errors(ROOT, text), "\n".join(claim_errors(ROOT, text))
+
+
+def test_demo_doc_has_no_unmarked_numbers():
+    stray = unmarked_numbers(demo_prose(DEMO_DOC.read_text()))
+    assert not stray, f"unmarked numbers in docs/DEMO.md: {stray}"
+
+
+def test_an_unmarked_number_in_the_demo_doc_is_flagged():
+    doc = "## Cold start\n\nThe station is healthy 4.2 s after launch.\n\n1. Run `--port 8765`.\n"
+    assert unmarked_numbers(demo_prose(doc)) == ["4.2"]
