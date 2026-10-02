@@ -169,7 +169,9 @@ def test_detail_free_frames_are_byte_identical_to_before_hf3_16(tmp_path):
         },
     ]
     for seed, expected in _DETAIL_FREE_HASHES.items():
-        path, _ = write_synth_station_clip(tmp_path / f"s{seed}", script, rail_positions=rail, seed=seed)
+        path, _ = write_synth_station_clip(
+            tmp_path / f"s{seed}", script, rail_positions=rail, seed=seed
+        )
         cap = cv2.VideoCapture(str(path))
         frames = []
         while True:

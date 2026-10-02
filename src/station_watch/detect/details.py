@@ -162,7 +162,11 @@ def _read_torque_stripe(crop: np.ndarray, config: dict) -> tuple[str, dict]:
     in_paint = (hue >= lo) & (hue <= hi) & (sat >= _MIN_SATURATION) & (val >= _MIN_VALUE)
     fill = float(in_paint.mean())
     state = "present" if fill >= config["min_fill"] else "absent"
-    scores = {"fill_fraction": round(fill, 4), "hue_range": [lo, hi], "min_fill": config["min_fill"]}
+    scores = {
+        "fill_fraction": round(fill, 4),
+        "hue_range": [lo, hi],
+        "min_fill": config["min_fill"],
+    }
     return state, scores
 
 
