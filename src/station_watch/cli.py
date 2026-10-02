@@ -86,6 +86,17 @@ def _add_run_parser(sub) -> None:
         type=int,
         help="stop after this many cycles (bounds a live-device or drill run)",
     )
+    run.add_argument(
+        "--evidence-dir",
+        default="data/local/evidence",
+        help="where to keep evidence thumbnails of citable frames "
+        "(default: data/local/evidence, under the gitignored local data dir)",
+    )
+    run.add_argument(
+        "--no-evidence",
+        action="store_true",
+        help="do not keep evidence thumbnails (write nothing under the evidence dir)",
+    )
 
 
 def _add_watchdog_parser(sub) -> None:
@@ -167,6 +178,7 @@ def _run(args) -> int:
         observations_path=args.observations,
         max_cycles=args.max_cycles,
         speed=args.speed,
+        evidence_dir=None if args.no_evidence else args.evidence_dir,
     )
     # SIGTERM (a service manager stopping the watch) finishes the current cycle
     # and shuts down cleanly, like Ctrl-C does.
