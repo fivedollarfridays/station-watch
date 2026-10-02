@@ -23,7 +23,7 @@ from station_watch.evaluate import (
     EXIT_CALIBRATION_LEAK,
     run_evaluation,
 )
-from station_watch.evaluate.calibration import CalibrationLeakError, held_out_calibration
+from station_watch.evaluate.calibration import held_out_calibration
 from station_watch.evaluate.manifest import load_manifest, sha256_file
 from station_watch.evaluate.synthetic import RAIL
 
@@ -268,7 +268,7 @@ def test_evaluate_split_conformance_end_to_end(tmp_path):
     cal_out = tmp_path / "cal-out"
     rc = _run_cli("evaluate", "--split", "calibration", "--config", str(cal_cfg),
                   "--manifest", str(cal_manifest), "--clips-dir", str(clips),
-                  "--out", str(cal_out), "--speed", "50")
+                  "--out", str(cal_out), "--force-out", "--speed", "50")
     assert rc.returncode == 0, rc.stderr
     for name in ("detect.json", "step_times.json"):
         prov = json.loads((cal_out / name).read_text())["provenance"]
@@ -287,7 +287,7 @@ def test_evaluate_split_conformance_end_to_end(tmp_path):
     reuse_out = tmp_path / "reuse-out"
     reuse = _run_cli("evaluate", "--split", "held_out", "--config", str(held_cfg),
                      "--manifest", str(reuse_manifest), "--clips-dir", str(clips),
-                     "--out", str(reuse_out), "--speed", "50")
+                     "--out", str(reuse_out), "--force-out", "--speed", "50")
     assert reuse.returncode == EXIT_CALIBRATION_LEAK, reuse.stderr
     assert cal_rel in reuse.stderr
     assert not (reuse_out / "detect.json").exists()
@@ -301,7 +301,7 @@ def test_evaluate_split_conformance_end_to_end(tmp_path):
     held_out_dir = tmp_path / "held-out"
     held = _run_cli("evaluate", "--split", "held_out", "--config", str(held_cfg),
                     "--manifest", str(fresh_manifest), "--clips-dir", str(clips),
-                    "--out", str(held_out_dir), "--speed", "50")
+                    "--out", str(held_out_dir), "--force-out", "--speed", "50")
     assert held.returncode == 0, held.stderr
     prov = json.loads((held_out_dir / "detect.json").read_text())["provenance"]
     assert prov["split"] == "held_out"

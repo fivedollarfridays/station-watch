@@ -81,9 +81,22 @@ def _scored(manifest, split: str) -> list:
     return clips
 
 
+def _is_normal_calibration(clip) -> bool:
+    """A calibration clip labeled as normal work: no fault/stall/keepout/creep intervals.
+
+    The measured step window must come from clips of normal running line, not from the
+    clips that stall, keep out or fault -- those bias the p95 the stall window is set
+    from (PR #5 P2). A held-out clip never feeds the calibration window either.
+    """
+    return clip.split == "calibration" and not (
+        clip.stalls or clip.keepouts or clip.camera_faults or clip.creeps
+    )
+
+
 def _run_clips(config, clips, work_dir: Path, speed: float, backends):
-    """Run every clip; return (detector outcomes, baseline outcomes, all steps)."""
+    """Run every clip; return (detector outcomes, baseline outcomes, normal steps, step_clips)."""
     outcomes, baselines, steps = [], [], []
+    step_clips = 0
     for index, clip in enumerate(clips):
         run = run_clip(
             config,
@@ -96,13 +109,15 @@ def _run_clips(config, clips, work_dir: Path, speed: float, backends):
         )
         outcomes.append(extract_outcome(clip, run))
         baselines.append(baseline_outcome(clip, config, clip.clip_path))
-        steps.extend(step_durations(run.observations))
-    return outcomes, baselines, steps
+        if _is_normal_calibration(clip):
+            steps.extend(step_durations(run.observations))
+            step_clips += 1
+    return outcomes, baselines, steps, step_clips
 
 
 def _write_outputs(out_dir: Path, *, meta: _Prov, bundle) -> None:
-    """Write detect.json, baseline.json and step_times.json, each with provenance."""
-    outcomes, baselines, steps = bundle
+    """Write detect.json, baseline.json and (if any normal clip) step_times.json."""
+    outcomes, baselines, steps, step_clips = bundle
     out_dir.mkdir(parents=True, exist_ok=True)
 
     def prov(detector: str) -> dict:
@@ -121,8 +136,18 @@ def _write_outputs(out_dir: Path, *, meta: _Prov, bundle) -> None:
         )
 
     write_measurement(out_dir / "detect.json", prov(DETECTOR), assemble_metrics(outcomes))
-    write_measurement(out_dir / "baseline.json", prov(BASELINE_DETECTOR), assemble_metrics(baselines))
-    write_step_times(out_dir / "step_times.json", step_stats(steps), prov(DETECTOR))
+    write_measurement(
+        out_dir / "baseline.json", prov(BASELINE_DETECTOR), assemble_metrics(baselines)
+    )
+    if step_clips == 0:
+        print(
+            "station-watch: no normal calibration clips (a normal clip has no stalls, "
+            "keepouts, camera_faults or creeps); step_times.json not written"
+        )
+        return
+    step_prov = prov(DETECTOR)
+    step_prov["step_clips"] = step_clips
+    write_step_times(out_dir / "step_times.json", step_stats(steps), step_prov)
 
 
 def _evaluate(config, scored, out_dir: Path, *, dataset, dataset_kind, manifest_sha,

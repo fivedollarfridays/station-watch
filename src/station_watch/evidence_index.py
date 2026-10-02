@@ -18,8 +18,6 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from station_watch.capture.metrics import fingerprint as _fingerprint
-
 INDEX_NAME = "index.jsonl"
 MISSES_NAME = "misses.jsonl"
 
@@ -113,6 +111,12 @@ def frame_from_clip(
     pass off a different frame. Returns :class:`MissingEvidence` with reason
     ``not_in_clip`` (the clip is shorter) or ``fingerprint_mismatch`` otherwise.
     """
+    # Imported lazily so loading this read-side module never pulls in the whole
+    # capture package (its __init__ imports Capture, which imports the evidence
+    # store, which imports this module -- a cycle that only resolves when capture
+    # is loaded first). A reader-only consumer (HF3.5 audit) never touches capture.
+    from station_watch.capture.metrics import fingerprint as _fingerprint
+
     cap = cv2.VideoCapture(str(clip_path))
     try:
         frame = None

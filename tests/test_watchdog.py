@@ -302,6 +302,7 @@ def test_every_module_is_reached_from_a_run_watchdog_drill_measure_or_board_entr
         "station_watch.physics.commandline",
         "station_watch.board.commandline",
         "station_watch.qa",
+        "station_watch.audit.commandline",
     ):
         assert entry in reached, f"{entry} entry point is not reached from the CLI"
 

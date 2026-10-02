@@ -220,7 +220,9 @@ def _run_config(path, step_times_path):
 
 def test_evaluate_subprocess_writes_step_times_the_run_subprocess_reads(tmp_path):
     eval_out = tmp_path / "measurements"
-    result = _run_cli("evaluate", "--synthetic", "--out", str(eval_out))
+    # --out is outside the synthetic tree (a pytest temp dir), so --force-out is
+    # required now that every evaluate --out is confined (HF3.9).
+    result = _run_cli("evaluate", "--synthetic", "--out", str(eval_out), "--force-out")
     assert result.returncode == 0, result.stderr
     step_times = eval_out / "step_times.json"
     assert step_times.exists(), "the evaluate run must write step_times.json (HF2.4's file)"
