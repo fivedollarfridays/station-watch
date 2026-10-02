@@ -168,3 +168,124 @@ def test_unknown_cause_helper_is_shared_with_regions():
 
     # Both call sites reach the same helper object -- the gates live in one place.
     assert details.read_region_quality is regions.read_region_quality
+
+
+# --- DetailTracker through the Detector: parent-gated persistence + the Judge -----
+
+KEEPOUT = {
+    "zone_press": {"region": [[4.0, 1.9], [5.3, 1.9], [5.3, 3.0], [4.0, 3.0]], "active": True}
+}
+STATION_ZONE = {"id": "bench", "region": [[0.3, 1.5], [5.5, 1.5], [5.5, 3.5], [0.3, 3.5]]}
+PERSISTENCE = 2
+
+
+def _config(required_slots):
+    from station_watch.config import StationConfig
+
+    return StationConfig.from_mapping(
+        {
+            "station_id": "station-1",
+            "camera_id": "cam-0",
+            "takt_s": 30.0,
+            "grace_s": 5.0,
+            "required_slots": required_slots,
+            "keepout_zones": [],
+            "liveness_window_s": 5.0,
+            "dark_luma_threshold": 15.0,
+            "dark_window_s": 2.0,
+            "frozen_frames": 10_000,
+            "recover_good_frames": 3,
+            "cycle_interval_s": 0.1,
+            "recover_healthy_verdicts": 2,
+            "fiducial": {
+                "dictionary_id": "DICT_4X4_50",
+                "marker_id": 0,
+                "expected_center_px": [58, 58],
+                "tolerance_px": 10,
+                "window_s": 10_000.0,
+            },
+            "alarm": {"sinks": ["screen"]},
+            "watchdog": {"cycle_window_s": 10.0, "alarm_eval_window_s": 10.0, "sinks": ["screen"]},
+            "detect": {
+                "persistence_frames": PERSISTENCE,
+                "emit_interval_s": 10_000.0,
+                "rail_positions": RAIL,
+                "station_zone": STATION_ZONE,
+                "keepout_rois": KEEPOUT,
+                "blur_threshold": 100.0,
+                "darkness_threshold": 40.0,
+                "occlusion_threshold": 0.5,
+                "slot_details": {"rail_pos_1": {"torque_stripe": STRIPE_REGION}},
+            },
+        }
+    )
+
+
+def _drive(tmp_path, script, required_slots, tag="clip"):
+    from station_watch.detect.detector import build_detector
+
+    path, _truth = write_synth_station_clip(tmp_path / tag, script, rail_positions=RAIL)
+    cap = cv2.VideoCapture(str(path))
+    frames = []
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        frames.append(frame)
+    cap.release()
+    detector = build_detector(_config(required_slots), run_id="r")
+    out = []
+    for fid, frame in enumerate(frames):
+        ts = f"2026-01-01T00:00:{fid:02d}.000000+00:00"
+        out.extend(detector.process(frame, fid, ts))
+    return out
+
+
+def _for(observations, target):
+    return [o for o in observations if o.target == target]
+
+
+def test_present_component_with_stripe_reads_part_present(tmp_path):
+    script = [
+        {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "present"}}}
+        for _ in range(5)
+    ]
+    obs = _drive(tmp_path, script, ["rail_pos_1", "rail_pos_1.torque_stripe"])
+    stripe = _for(obs, "rail_pos_1.torque_stripe")
+    assert stripe, "the detail tracker emits for the dotted target"
+    assert stripe[-1].kind.value == "part_present"
+    assert "torque_stripe" in stripe[-1].method
+
+
+def test_present_component_without_stripe_reads_part_absent(tmp_path):
+    script = [
+        {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "absent"}}}
+        for _ in range(5)
+    ]
+    obs = _drive(tmp_path, script, ["rail_pos_1", "rail_pos_1.torque_stripe"])
+    stripe = _for(obs, "rail_pos_1.torque_stripe")
+    assert stripe[-1].kind.value == "part_absent"
+
+
+def test_missing_component_stripe_is_parent_not_present(tmp_path):
+    script = [{"positions": {"rail_pos_1": "absent"}} for _ in range(5)]
+    obs = _drive(tmp_path, script, ["rail_pos_1", "rail_pos_1.torque_stripe"])
+    stripe = _for(obs, "rail_pos_1.torque_stripe")
+    assert stripe, "the detail still emits while the parent is absent"
+    assert all(o.kind.value == "part_unknown" for o in stripe)
+    assert stripe[-1].detector_output["cause"] == "parent_not_present"
+
+
+def test_judge_raises_exactly_one_missing_part_for_a_missing_component(tmp_path):
+    from station_watch.judge_rules import missing_part_faults
+
+    script = [{"positions": {"rail_pos_1": "absent"}} for _ in range(5)]
+    required = ["rail_pos_1", "rail_pos_1.torque_stripe"]
+    obs = _drive(tmp_path, script, required)
+    by_target = {}
+    for o in obs:
+        by_target.setdefault(o.target, []).append(o)
+
+    faults = missing_part_faults(by_target, required)
+    targets = [f.target for f in faults]
+    assert targets == ["rail_pos_1"], f"one fault (the position), none for its stripe: {targets}"

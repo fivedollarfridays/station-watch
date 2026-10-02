@@ -10,14 +10,17 @@ station never limps along half-wired; the CLI turns that into a non-zero exit.
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+import yaml
 
 from station_watch.alarm.sink import AlarmError, Sink, build_sinks
 from station_watch.capture.blind import BlindThresholds
 from station_watch.capture.source import CaptureError, FrameSource
 from station_watch.config import StationConfig, load_station_config
 from station_watch.detect.detector import detect_targets_configured
+from station_watch.evidence import EvidenceSettings
 from station_watch.detect.yolox import (
     WeightsError,
     YoloxBackend,
@@ -46,6 +49,7 @@ class RunContext:
     # back to ``takt_s + grace_s`` rather than silently judging on a 0 s window.
     stall_window_s: float | None = None
     stall_window_source: str = ""
+    evidence_settings: EvidenceSettings = field(default_factory=EvidenceSettings)
 
 
 def parse_source(spec: str) -> int | str:
@@ -63,6 +67,12 @@ def load_config(path: str) -> StationConfig:
         raise StartupError(str(exc.args[0])) from exc
     except (ValueError, OSError) as exc:
         raise StartupError(f"could not read config {path}: {exc}") from exc
+
+
+def load_evidence_settings(path: str) -> EvidenceSettings:
+    """Read the optional ``evidence:`` config section (retention knobs), else defaults."""
+    raw = yaml.safe_load(Path(path).read_text())
+    return EvidenceSettings.from_config_mapping(raw if isinstance(raw, dict) else None)
 
 
 def build_alarm_sinks(config: StationConfig, *, record_path: str | None) -> list[Sink]:
@@ -165,6 +175,7 @@ def build_context(
         keepout_backend=keepout_backend,
         stall_window_s=stall_window_s,
         stall_window_source=stall_window_source,
+        evidence_settings=load_evidence_settings(config_path),
     )
 
 

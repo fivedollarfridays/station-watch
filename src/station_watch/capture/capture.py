@@ -48,7 +48,8 @@ from station_watch.capture.source import FrameSource
 from station_watch.clock import utc_now_iso
 from station_watch.detect.detector import Detector
 from station_watch.detect.geometry import find_marker_corners, marker_center
-from station_watch.records import FrameRecord
+from station_watch.evidence import EvidenceStore
+from station_watch.records import BlindState, FrameRecord
 
 _MONO_EPSILON = 1e-9
 _BACKOFF_START_S = 0.05
@@ -71,6 +72,7 @@ class Capture:
         monotonic: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
         detector: Detector | None = None,
+        evidence: EvidenceStore | None = None,
     ):
         if speed <= 0:
             raise ValueError(f"speed must be positive, got {speed}")
@@ -84,6 +86,7 @@ class Capture:
         self._monotonic = monotonic
         self._sleep = sleep
         self._detect = DetectStep(detector) if detector is not None else None
+        self._evidence = evidence
         self._stopped = False
         self._stop_event = threading.Event()
         self.first_frame = threading.Event()
@@ -157,7 +160,7 @@ class Capture:
             station_id=self._station_id,
             camera_id=self._camera_id,
             run_id=self._run_id,
-            sink=log.append,
+            sink=self._blind_sink(log),
             clock=self._clock,
         )
         start = self._monotonic()
@@ -174,6 +177,24 @@ class Capture:
         finally:
             stop_event.set()
             timer.join(timeout=1.0)
+
+    def _blind_sink(self, log):
+        """The Log sink for blind records, teeing an opened record to the evidence store.
+
+        A ``BlindRecord`` carries the last good frame id before the blind; writing
+        that frame as evidence keeps the citable "last we saw" shot a blind episode
+        points at. Teeing here (not inside the watch) keeps evidence optional and
+        off the blind state machine's path entirely.
+        """
+        if self._evidence is None:
+            return log.append
+
+        def sink(record) -> None:
+            log.append(record)
+            if record.state is BlindState.OPENED:
+                self._evidence.note_blind_open(record.last_good_frame_id)
+
+        return sink
 
     def _drive(self, log, watch: BlindWatch, fiducial: dict, start: float) -> None:
         """The frame loop: read, stamp, log, and fan each frame out to the watch."""
@@ -216,8 +237,20 @@ class Capture:
         # corners and hand the same corners to Detect (K12, no double detection).
         corners = find_marker_corners(frame, fiducial["dictionary_id"], fiducial["marker_id"])
         watch.observe_frame(record, marker_center(corners))
+        had_observation = False
         if self._detect is not None:
-            self._detect(log, frame, record.frame_id, record.ts, corners)
+            had_observation = self._detect(log, frame, record.frame_id, record.ts, corners) > 0
+        if self._evidence is not None:
+            # Every frame is offered (any may be a blind's last good frame); the
+            # evidence store writes it only if cited, all off the Capture thread.
+            self._evidence.note_frame(
+                frame,
+                record.frame_id,
+                record.ts,
+                record.fingerprint,
+                corners,
+                had_observation=had_observation,
+            )
 
     def _frame_failed(self, watch: BlindWatch, exc: Exception, frame_id: int) -> None:
         """Record a per-frame processing error as ``disconnected``; report it once."""

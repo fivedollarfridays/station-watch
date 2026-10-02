@@ -23,6 +23,7 @@ a Detector and refuses ``--observations`` (one source of observations per run).
 
 from __future__ import annotations
 
+from station_watch.detect.details import DetailTracker, detail_targets_configured
 from station_watch.detect.geometry import find_marker_corners
 from station_watch.detect.keepout import KeepoutTracker
 from station_watch.detect.motion import MotionTracker
@@ -49,6 +50,7 @@ def detect_targets_configured(config) -> bool:
         bool(config.detect["rail_positions"])
         or _motion_configured(config)
         or bool(config.keepout_zones)
+        or detail_targets_configured(config)
     )
 
 
@@ -71,12 +73,18 @@ class Detector:
         self._run_id = run_id
         self._fiducial = config.fiducial
         self._trackers: list = []
+        position_tracker = None
         if config.detect["rail_positions"]:
-            self.add_tracker(PositionTracker(config, run_id))
+            position_tracker = PositionTracker(config, run_id)
+            self.add_tracker(position_tracker)
         if _motion_configured(config):
             self.add_tracker(MotionTracker(config, run_id))
         if config.keepout_zones:
             self.add_tracker(KeepoutTracker(config, run_id, keepout_backend))
+        # Details come last so each frame's parent-position confirmed state is already
+        # updated when a detail is judged against it.
+        if detail_targets_configured(config):
+            self.add_tracker(DetailTracker(config, run_id, position_tracker))
 
     def add_tracker(self, tracker) -> None:
         """Compose one more tracker into the per-frame fan-out."""

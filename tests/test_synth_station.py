@@ -14,9 +14,18 @@ import sys
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
 from helpers.synth_station import write_synth_station_clip  # noqa: E402
+
+
+def _first_frame(path):
+    cap = cv2.VideoCapture(str(path))
+    ok, frame = cap.read()
+    cap.release()
+    assert ok
+    return frame
 
 
 def _read_back_count(path: Path) -> int:
@@ -100,3 +109,32 @@ def test_rendered_marker_is_detectable_and_regions_land_on_it(tmp_path):
     region = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]
     pixels = region_to_pixels(region, corners)
     assert pixels is not None and pixels.shape == (4, 2)
+
+
+# --- HF3.15: the details knob draws a stripe, labels it, and is a no-op when off ---
+
+
+def test_a_frame_without_details_is_byte_identical_to_an_all_absent_detail_frame(tmp_path):
+    # A frame with no `details` key, and one whose only detail is "absent", draw the
+    # same pixels for the same seed -- the detail machinery adds nothing when nothing
+    # is present, so every existing (detail-free) clip renders exactly as before.
+    base = {"positions": {"rail_pos_1": "present"}}
+    absent = {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "absent"}}}
+    present = {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "present"}}}
+
+    p_base, _ = write_synth_station_clip(tmp_path / "base", [base], seed=3)
+    p_absent, _ = write_synth_station_clip(tmp_path / "absent", [absent], seed=3)
+    p_present, _ = write_synth_station_clip(tmp_path / "present", [present], seed=3)
+
+    assert np.array_equal(_first_frame(p_base), _first_frame(p_absent)), "absent detail draws nothing"
+    assert not np.array_equal(_first_frame(p_base), _first_frame(p_present)), "a stripe changes pixels"
+
+
+def test_ground_truth_carries_the_drawn_details(tmp_path):
+    script = [
+        {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "present"}}},
+        {"positions": {"rail_pos_1": "present"}},
+    ]
+    _path, truth = write_synth_station_clip(tmp_path / "d", script)
+    assert truth[0]["details"] == {"rail_pos_1": {"torque_stripe": "present"}}
+    assert truth[1]["details"] == {}, "a frame with no details key reports no details drawn"

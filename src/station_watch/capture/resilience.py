@@ -68,10 +68,14 @@ class DetectStep:
         self._detector = detector
         self._error_reported = False
 
-    def __call__(self, log, frame: np.ndarray, frame_id: int, ts: str, corners) -> None:
-        """A Detect exception must not kill Capture and must not look disconnected:
+    def __call__(self, log, frame: np.ndarray, frame_id: int, ts: str, corners) -> int:
+        """Run Detect on one frame; return how many observations it emitted.
+
+        A Detect exception must not kill Capture and must not look disconnected:
         every target reads ``part_unknown`` with cause ``detect_error`` and the
-        error text, reported once per episode (a later clean read ends it).
+        error text, reported once per episode (a later clean read ends it). The
+        count lets Capture's evidence hook keep every frame a fault can cite -- a
+        fault's frame ids are exactly the frames Detect emitted an observation for.
 
         ``corners`` are the marker corners Capture already found this frame, passed
         through so Detect never searches for the marker a second time.
@@ -87,6 +91,7 @@ class DetectStep:
             observations = self._detector.unknown_all(frame_id, ts, CAUSE_DETECT_ERROR, detail)
         for observation in observations:
             log.append(observation)
+        return len(observations)
 
 
 __all__ = ["DetectStep", "error_detail", "liveness_loop", "reopen_source", "report"]

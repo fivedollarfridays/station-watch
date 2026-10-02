@@ -385,6 +385,50 @@ def _wait_until_cycles(logdb, at_least, deadline_s=15.0):
     return False
 
 
+# --- HF3.15: a torque-stripe detail, end to end through a real `station-watch run` -
+
+
+STRIPE_REGION = [[0.85, 2.05], [1.55, 2.05], [1.55, 2.25], [0.85, 2.25]]
+
+
+def test_missing_torque_stripe_faults_once_and_recovers_when_restored(tmp_path):
+    # rail_pos_1's torque stripe is required. The component is present throughout; the
+    # stripe is missing for the first half (one missing_part:rail_pos_1.torque_stripe
+    # episode, citing real frames) then restored (the run recovers to healthy).
+    config = _write_config(
+        tmp_path / "station.yaml",
+        required_slots=["rail_pos_1.torque_stripe"],
+        detect={"rail_positions": RAIL, "slot_details": {"rail_pos_1": {"torque_stripe": STRIPE_REGION}}},
+    )
+    missing = [
+        {"positions": {"rail_pos_1": "present", "rail_pos_2": "present"}, "details": {"rail_pos_1": {"torque_stripe": "absent"}}}
+        for _ in range(30)
+    ]
+    restored = [
+        {"positions": {"rail_pos_1": "present", "rail_pos_2": "present"}, "details": {"rail_pos_1": {"torque_stripe": "present"}}}
+        for _ in range(30)
+    ]
+    clip = _clip(tmp_path, "stripe", missing + restored, fps=20.0)
+
+    verdicts, alarms = _run_scenario(tmp_path, clip, config)
+
+    missing_faults = [
+        f
+        for v in verdicts
+        if v.state is VerdictState.FAULT
+        for f in v.faults
+        if f.kind is FaultKind.MISSING_PART
+    ]
+    assert missing_faults, "the missing torque stripe raises missing_part (read back from the Log)"
+    assert {f.target for f in missing_faults} == {"rail_pos_1.torque_stripe"}, "exactly the detail"
+    total_frames = len(missing) + len(restored)
+    assert all(
+        f.frame_ids and all(0 <= fid < total_frames for fid in f.frame_ids) for f in missing_faults
+    ), "the fault cites frames that exist in the clip"
+    assert [a["cause"] for a in alarms] == ["missing_part:rail_pos_1.torque_stripe"], "one episode"
+    assert any(v.state is VerdictState.HEALTHY for v in verdicts), "restoring the stripe recovers"
+
+
 def test_watchdog_fires_the_alarm_stage_beside_a_detect_enabled_run(tmp_path):
     config = _write_config(
         tmp_path / "station.yaml", required_slots=list(RAIL), detect={"rail_positions": RAIL}

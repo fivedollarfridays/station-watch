@@ -80,9 +80,7 @@ def build_log(path, *, verdicts, cycle_offset=None, observations=()):
             log.append(_observation(offset, kind, target, frame_id))
         if cycle_offset is not None:
             log.append(
-                CycleCompleted(
-                    ts=offset_iso(BASE, cycle_offset), cycle=0, stages=(), run_id=RUN_ID
-                )
+                CycleCompleted(ts=offset_iso(BASE, cycle_offset), cycle=0, stages=(), run_id=RUN_ID)
             )
 
 
@@ -297,8 +295,17 @@ def test_qa_out_writes_measurement_file(tmp_path):
     config = _write_config(tmp_path / "c.yaml", qa={"max_unknown_fraction": 0.9})
     out_rel = "measurements/synthetic/qa.json"
     result = _run_cli(
-        ["qa", "--config", str(config), "--log", str(log), "--out", out_rel,
-         "--dataset-kind", "synthetic"],
+        [
+            "qa",
+            "--config",
+            str(config),
+            "--log",
+            str(log),
+            "--out",
+            out_rel,
+            "--dataset-kind",
+            "synthetic",
+        ],
         cwd=tmp_path,
     )
     assert result.returncode == 0, result.stderr
@@ -328,8 +335,17 @@ def _e2e_config(tmp_path) -> Path:
 def _run_and_qa(tmp_path, clip, cfg, label):
     log = tmp_path / f"{label}.db"
     run = _run_cli(
-        ["run", "--config", str(cfg), "--source", str(clip), "--log", str(log),
-         "--alarm-record", str(tmp_path / f"{label}.jsonl")],
+        [
+            "run",
+            "--config",
+            str(cfg),
+            "--source",
+            str(clip),
+            "--log",
+            str(log),
+            "--alarm-record",
+            str(tmp_path / f"{label}.jsonl"),
+        ],
         cwd=tmp_path,
     )
     assert run.returncode == 0, run.stderr
@@ -358,8 +374,14 @@ def test_sessionqa_is_frozen_with_interface_fields(tmp_path):
     result = session_qa(_config(qa={"max_unknown_fraction": 0.5}), log)
     assert isinstance(result, SessionQA)
     for field in (
-        "status", "reason", "session_s", "observable_s", "unobservable_fraction",
-        "target_unknown_fraction", "verdicts", "max_unknown_fraction",
+        "status",
+        "reason",
+        "session_s",
+        "observable_s",
+        "unobservable_fraction",
+        "target_unknown_fraction",
+        "verdicts",
+        "max_unknown_fraction",
     ):
         assert hasattr(result, field)
     assert result.verdicts == 10

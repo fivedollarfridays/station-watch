@@ -27,7 +27,12 @@ import yaml
 from station_watch.board.reader import BoardLogError, LogReader
 from station_watch.clock import parse_iso
 from station_watch.config import validate_required_keys
-from station_watch.evaluate.provenance import DETECTOR, build_provenance, confine_out, write_measurement
+from station_watch.evaluate.provenance import (
+    DETECTOR,
+    build_provenance,
+    confine_out,
+    write_measurement,
+)
 from station_watch.records import ObservationKind, VerdictState
 
 QA_UNKNOWN_KEY = "qa.max_unknown_fraction"
@@ -104,7 +109,7 @@ def _unknown_overlap(start: float, stop: float, events) -> float:
         return 0.0
     bounds = [start] + [t for t, _ in events if start < t < stop] + [stop]
     total = 0.0
-    for a, b in zip(bounds, bounds[1:]):
+    for a, b in zip(bounds, bounds[1:], strict=False):
         active = None
         for t, unknown in events:
             if t <= a:
@@ -168,8 +173,13 @@ def session_qa(config, log_path) -> SessionQA:
         t: _target_fraction(t, by_target, observable_segments, observable_s) for t in targets
     }
     return _verdict(
-        max_unknown, max_target, session_s, observable_s,
-        unobservable_fraction, target_unknown_fraction, len(verdicts),
+        max_unknown,
+        max_target,
+        session_s,
+        observable_s,
+        unobservable_fraction,
+        target_unknown_fraction,
+        len(verdicts),
     )
 
 
@@ -222,7 +232,9 @@ def _print_result(result: SessionQA) -> None:
         print(f"  target {target}: {frac:.3f}")
 
 
-def _write_measurement(out: Path, result: SessionQA, config: dict, config_path, dataset_kind) -> None:
+def _write_measurement(
+    out: Path, result: SessionQA, config: dict, config_path, dataset_kind
+) -> None:
     provenance = build_provenance(
         dataset=str(config.get("station_id", "station")),
         dataset_kind=dataset_kind,

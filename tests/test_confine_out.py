@@ -9,7 +9,6 @@ rule, so a proving run can never overwrite a real-dataset measurement by mistake
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
