@@ -25,9 +25,11 @@ def reproduce_command(args) -> str:
         args.out,
         "--dataset-kind",
         args.dataset_kind,
-        "--source",
-        str(args.source),
     ]
+    if getattr(args, "synthetic_loop", False):
+        parts.append("--synthetic-loop")
+    else:
+        parts += ["--source", str(args.source)]
     if args.hours is not None:
         parts += ["--hours", str(args.hours)]
     else:

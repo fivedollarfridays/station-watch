@@ -12,8 +12,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from station_watch.board.reader import BoardLogError
 from station_watch.audit.verdicts import VALID_VERDICTS
+from station_watch.board.reader import BoardLogError
 
 _DEFAULT_EVIDENCE_DIR = "data/local/evidence"
 _DEFAULT_REVIEW_PORT = 8766
@@ -33,6 +33,7 @@ def add_parser(sub) -> None:
     _add_review(actions)
     _add_mark(actions)
     _add_score(actions)
+    _add_rate(actions)
 
 
 def _add_build(actions) -> None:
@@ -108,6 +109,37 @@ def _add_score(actions) -> None:
     )
 
 
+def _add_rate(actions) -> None:
+    rate = actions.add_parser(
+        "rate",
+        help="write a flags-per-hour measurement file for a normal-work session",
+        description="From flags.json, verdicts.jsonl and the session's QA, write flags per "
+        "hour of observable operation -- split true/false/unreviewed per kind and overall -- "
+        "to a measurement file (confined to the dataset kind's own tree). Blind episodes are "
+        "reported in their own block. Observable time under --min-hours writes a status, not a "
+        "rate.",
+    )
+    rate.add_argument("--audit", required=True, help="the audit dir holding flags.json")
+    rate.add_argument("--config", required=True, help="path to the station config YAML")
+    rate.add_argument("--log", required=True, help="path to the session's append-only Log")
+    rate.add_argument(
+        "--dataset-kind",
+        required=True,
+        choices=["real", "synthetic"],
+        help="which measurement tree --out must land in",
+    )
+    rate.add_argument("--out", required=True, help="measurement file to write")
+    rate.add_argument(
+        "--min-hours",
+        type=float,
+        default=1.0,
+        help="minimum observable hours to measure a rate (default: 1.0)",
+    )
+    rate.add_argument(
+        "--force-out", action="store_true", help="override --out confinement (one warning line)"
+    )
+
+
 def _default_out(log_path: str) -> str:
     return str(Path("data/local/audit") / Path(log_path).stem)
 
@@ -137,7 +169,10 @@ def _run_review(args) -> int:
         args.audit, flags, [f["flag_id"] for f in flags], reviewer, port=args.port
     )
     host, port = server.server_address[:2]
-    print(f"station-watch audit review: serving {args.audit} on http://{host}:{port}/ (Ctrl-C to stop)")
+    print(
+        f"station-watch audit review: serving {args.audit} on "
+        f"http://{host}:{port}/ (Ctrl-C to stop)"
+    )
     print(f"station-watch audit review: token {server.token}", file=sys.stderr)
     sys.stdout.flush()
     sys.stderr.flush()
@@ -181,7 +216,27 @@ def _run_score(args) -> int:
     )
 
 
-_HANDLERS = {"build": _run_build, "review": _run_review, "mark": _run_mark, "score": _run_score}
+def _run_rate(args) -> int:
+    from station_watch.audit.rate import rate_audit
+
+    return rate_audit(
+        audit_dir=args.audit,
+        config_path=args.config,
+        log_path=args.log,
+        dataset_kind=args.dataset_kind,
+        out=args.out,
+        min_hours=args.min_hours,
+        force_out=args.force_out,
+    )
+
+
+_HANDLERS = {
+    "build": _run_build,
+    "review": _run_review,
+    "mark": _run_mark,
+    "score": _run_score,
+    "rate": _run_rate,
+}
 
 
 def handle(args) -> int:

@@ -1,0 +1,93 @@
+# Station config for the SYNTHETIC soak (bench-free, reproducible).
+#
+# The soak's runner child feeds the real pipeline a SyntheticSource looping a
+# normal-work script (both rail parts present, short motion bursts, no faults) --
+# so the geometry here matches the synthetic bench renderer exactly as the drill's
+# config does: marker at centre (58, 58), the two rail positions where the renderer
+# draws the parts, and no keep-out zone (so the run needs no downloaded person
+# model). Motion tracking is off, so a still rendered scene never reads as a stall
+# between the script's motion bursts. Cadence is one cycle a second -- a realistic
+# soak rhythm over hours, not the drill's fast fault timing.
+station_id: station-1
+camera_id: cam-0
+takt_s: 30.0
+grace_s: 5.0
+required_slots:
+- rail_pos_1
+- rail_pos_2
+keepout_zones: []
+liveness_window_s: 3.0
+dark_luma_threshold: 15.0
+dark_window_s: 2.0
+frozen_frames: 20
+recover_good_frames: 3
+cycle_interval_s: 1.0
+recover_healthy_verdicts: 2
+fiducial:
+  dictionary_id: DICT_4X4_50
+  marker_id: 0
+  expected_center_px:
+  - 58
+  - 58
+  tolerance_px: 10
+  window_s: 2.0
+# Soak growth thresholds (judged over the post-warmup samples). A clean pipeline
+# holds roughly flat; these bounds catch a real leak or stall without flagging the
+# ordinary jitter of a short synthetic run.
+soak:
+  max_rss_growth_mb_per_h: 50.0
+  max_log_mb_per_h: 200.0
+  max_board_render_s: 2.0
+  max_verdict_gap_s: 30.0
+  max_false_flags: 0
+  warmup_s: 30.0
+qa:
+  max_unknown_fraction: 0.5
+# A headless soak writes nothing unless something fires: the screen sink prints an
+# alarm line to stderr only on a state change, and a clean normal-work soak has none.
+alarm:
+  sinks:
+  - screen
+watchdog:
+  cycle_window_s: 5.0
+  alarm_eval_window_s: 5.0
+  sinks:
+  - screen
+detect:
+  persistence_frames: 2
+  emit_interval_s: 0.5
+  rail_positions:
+    rail_pos_1:
+    - - 0.7
+      - 1.9
+    - - 1.7
+      - 1.9
+    - - 1.7
+      - 2.5
+    - - 0.7
+      - 2.5
+    rail_pos_2:
+    - - 2.5
+      - 1.9
+    - - 3.5
+      - 1.9
+    - - 3.5
+      - 2.5
+    - - 2.5
+      - 2.5
+  station_zone:
+    id: bench
+    region:
+    - - 0.3
+      - 1.5
+    - - 5.5
+      - 1.5
+    - - 5.5
+      - 3.5
+    - - 0.3
+      - 3.5
+  keepout_rois: {}
+  blur_threshold: 100.0
+  darkness_threshold: 40.0
+  occlusion_threshold: 0.5
+  unknown_grace_s: 10000.0

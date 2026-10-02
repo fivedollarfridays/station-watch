@@ -43,6 +43,8 @@ class SyntheticSource:
         *,
         fps: float = 20.0,
         spec: dict | None = None,
+        script: list[dict] | None = None,
+        loop: bool = False,
         render_opts: dict | None = None,
         monotonic: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
@@ -50,8 +52,12 @@ class SyntheticSource:
     ) -> None:
         if fps <= 0:
             raise ValueError(f"SyntheticSource fps must be > 0, got {fps!r}")
+        if script is not None and not script:
+            raise ValueError("SyntheticSource script must be a non-empty list of specs")
         self._fps = float(fps)
         self._spec = _DEFAULT_SPEC if spec is None else spec
+        self._script = script
+        self._loop = loop
         self._ctx = _build_context(render_opts or {})
         self._clock = clock or FrameClock(self._fps, monotonic=monotonic, sleep=sleep)
         self._frame_id = 0
@@ -69,9 +75,22 @@ class SyntheticSource:
     def read(self) -> np.ndarray | None:
         """Pace to the next frame slot, then render and return that frame."""
         self._clock.tick()
-        frame = _render_frame(self._spec, self._frame_id, self._ctx)
+        frame = _render_frame(self._spec_for(self._frame_id), self._frame_id, self._ctx)
         self._frame_id += 1
         return frame
+
+    def _spec_for(self, index: int) -> dict:
+        """The spec for frame ``index``: the single spec, or the scripted one.
+
+        With no script, every frame renders the one ``spec`` (unchanged behaviour).
+        A ``loop`` script wraps round its specs forever -- the never-ending normal-work
+        stream a soak needs; a non-looping script clamps at its last spec once spent.
+        """
+        if self._script is None:
+            return self._spec
+        if self._loop:
+            return self._script[index % len(self._script)]
+        return self._script[min(index, len(self._script) - 1)]
 
     def drop(self) -> None:
         """Let the next frame slot pass with no frame delivered (a pulled cable)."""
