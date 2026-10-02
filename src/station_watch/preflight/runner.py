@@ -25,6 +25,7 @@ CHECKS: dict = {
     "camera": cam.check_camera,
     "frames_live": cam.check_frames_live,
     "fiducial": cam.check_fiducial,
+    "camera_stability": cam.check_camera_stability,
     "model_weights": sysc.check_model_weights,
     "log_writable": sysc.check_log_writable,
     "disk_space": sysc.check_disk_space,
@@ -58,12 +59,17 @@ def run_preflight(
     log_path: str,
     *,
     board_port: int | None = None,
+    drift_s: float = 5.0,
     checks: dict | None = None,
 ) -> list[CheckResult]:
     """Run the checks in order against one station and return the per-check results."""
     registry = CHECKS if checks is None else checks
     ctx = PreflightContext(
-        config_path=config_path, source=source, log_path=log_path, board_port=board_port
+        config_path=config_path,
+        source=source,
+        log_path=log_path,
+        board_port=board_port,
+        drift_s=drift_s,
     )
     results: list[CheckResult] = []
     try:

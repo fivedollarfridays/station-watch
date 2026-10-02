@@ -38,6 +38,13 @@ class FrameSource:
         reported = self._cap.get(cv2.CAP_PROP_FPS)
         return float(reported) if reported and reported > 0 else 0.0
 
+    @property
+    def resolution(self) -> tuple[int, int]:
+        """Reported ``(width, height)`` in pixels (``preflight --list-cameras``)."""
+        width = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        return width, height
+
     def read(self) -> np.ndarray | None:
         """The next frame, or ``None`` at end-of-stream / read failure."""
         ok, frame = self._cap.read()
