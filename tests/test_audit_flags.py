@@ -24,7 +24,7 @@ def _t(offset: float) -> str:
     return offset_iso(EPOCH, offset)
 
 
-def _verdict(seq, offset, faults, state=VerdictState.FAULT):
+def _verdict(seq, offset, faults, state=VerdictState.FAULT, run_id=RUN):
     return Verdict(
         station_id="station-1",
         ts=_t(offset),
@@ -32,7 +32,7 @@ def _verdict(seq, offset, faults, state=VerdictState.FAULT):
         faults=tuple(faults),
         blind_reasons=(),
         seq=seq,
-        run_id=RUN,
+        run_id=run_id,
     )
 
 
@@ -136,3 +136,18 @@ def test_flag_ids_are_identical_across_two_passes(tmp_path):
     second = [f.flag_id for f in _flags(log)]
     assert first == second
     assert len(first) == 3
+
+
+def test_a_fault_still_present_across_two_runs_is_one_episode_per_run(tmp_path):
+    # Run A ends faulted and run B starts faulted with no clearing verdict between:
+    # two sessions are two episodes, each stamped with its own run.
+    log = tmp_path / "log.db"
+    _write(
+        log,
+        [
+            _verdict(1, 0, [_missing("rail_pos_1", [3])], run_id="run-a"),
+            _verdict(1, 5, [_missing("rail_pos_1", [4])], run_id="run-b"),
+        ],
+    )
+    flags = _flags(log)
+    assert [(f.run_id, f.frame_ids) for f in flags] == [("run-a", (3,)), ("run-b", (4,))]

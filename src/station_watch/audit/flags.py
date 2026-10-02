@@ -74,11 +74,15 @@ def collect_flags(reader) -> list[AuditFlag]:
 
 
 def _fault_flags(verdicts) -> list[AuditFlag]:
-    """One :class:`AuditFlag` per contiguous ``(kind, target)`` fault episode."""
+    """One :class:`AuditFlag` per contiguous ``(run_id, kind, target)`` fault episode.
+
+    Keyed by run too: a fault still present when one run ends and another starts is
+    two sessions, so two episodes, never one stitched across runs.
+    """
     open_episodes: dict = {}
     flags: list[AuditFlag] = []
     for verdict in verdicts:
-        present = {(f.kind, f.target): f for f in verdict.faults}
+        present = {(verdict.run_id, f.kind, f.target): f for f in verdict.faults}
         for key in list(open_episodes):
             if key not in present:
                 flags.append(_finish_fault(key, open_episodes.pop(key)))
@@ -101,7 +105,7 @@ def _fault_flags(verdicts) -> list[AuditFlag]:
 
 
 def _finish_fault(key, episode) -> AuditFlag:
-    kind, target = key
+    _run_id, kind, target = key
     return AuditFlag(
         flag_id=f"{episode['run_id']}:{kind.value}:{target}:{episode['first_seq']}",
         kind=kind.value,
@@ -116,7 +120,7 @@ def _finish_fault(key, episode) -> AuditFlag:
 
 def _blind_flags(blinds) -> list[AuditFlag]:
     """One :class:`AuditFlag` per ``opened`` blind, paired FIFO with its ``cleared``."""
-    waiting: dict = {}  # reason -> FIFO of still-open episode dicts
+    waiting: dict = {}  # (run_id, reason) -> FIFO of still-open episode dicts
     episodes: list[dict] = []
     for record in blinds:
         if record.state is BlindState.OPENED:
@@ -130,9 +134,9 @@ def _blind_flags(blinds) -> list[AuditFlag]:
                 "last_good": record.last_good_frame_id,
             }
             episodes.append(episode)
-            waiting.setdefault(record.reason, []).append(episode)
+            waiting.setdefault((record.run_id, record.reason), []).append(episode)
         else:
-            queue = waiting.get(record.reason)
+            queue = waiting.get((record.run_id, record.reason))
             if queue:
                 queue.pop(0)["closed_ts"] = record.ts
     return [_finish_blind(episode) for episode in episodes]

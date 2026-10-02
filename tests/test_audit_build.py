@@ -56,7 +56,7 @@ def _frame(frame_id, offset):
     )
 
 
-def _verdict(seq, offset, target, frame_ids):
+def _verdict(seq, offset, target, frame_ids, run_id=RUN):
     return Verdict(
         station_id="station-1",
         ts=_t(offset),
@@ -64,7 +64,7 @@ def _verdict(seq, offset, target, frame_ids):
         faults=(Fault(kind=FaultKind.MISSING_PART, target=target, frame_ids=tuple(frame_ids)),),
         blind_reasons=(),
         seq=seq,
-        run_id=RUN,
+        run_id=run_id,
     )
 
 
@@ -76,8 +76,8 @@ def _two_fault_log(path: Path) -> Path:
     return path
 
 
-def _write_evidence(evidence_dir: Path, frame_id: int, corners) -> None:
-    run_dir = evidence_dir / RUN
+def _write_evidence(evidence_dir: Path, frame_id: int, corners, run_id: str = RUN) -> None:
+    run_dir = evidence_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     image = np.full((120, 120, 3), 40, dtype=np.uint8)
     name = f"frame_{frame_id:08d}.jpg"
@@ -148,3 +148,25 @@ def test_build_is_deterministic_and_leaves_the_log_bytes_unchanged(tmp_path):
     assert (tmp_path / "a" / "flags.json").read_bytes() == (
         tmp_path / "b" / "flags.json"
     ).read_bytes(), "flag ids/order must be identical across two builds (AC2)"
+
+
+def test_a_two_run_log_resolves_each_flag_against_its_own_runs_evidence(tmp_path):
+    # frame_id restarts at every run, so run B's frame 1 is not run A's frame 1 (K4):
+    # with evidence kept only for run A, run B's citation of frame 1 must say so,
+    # never borrow run A's thumbnail.
+    cfg = _config(tmp_path / "station.yaml")
+    log = tmp_path / "log.db"
+    with Log(log) as handle:
+        handle.append(_verdict(1, 0, "rail_pos_1", [1], run_id="run-a"))
+        handle.append(_verdict(1, 10, "rail_pos_1", [1], run_id="run-b"))
+    evidence = tmp_path / "evidence"
+    _write_evidence(evidence, 1, None, run_id="run-a")
+    out = tmp_path / "out"
+
+    build_audit(config_path=cfg, log_path=log, evidence_dir=evidence, clip=None, out=out)
+
+    flags = json.loads((out / "flags.json").read_text())
+    assert [f["run_id"] for f in flags] == ["run-a", "run-b"]
+    sheet = (out / "index.html").read_text()
+    assert sheet.count("data:image/jpeg;base64,") == 1, "only run A's frame 1 has evidence"
+    assert "no evidence: not_captured" in sheet
