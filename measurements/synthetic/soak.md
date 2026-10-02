@@ -5,6 +5,8 @@
 - git commit: `397dede548b5d679a33a3997e49993c0f273c3ea`
 - detector: `station_watch.detect:real-pipeline:v1`
 
+A pass covers memory and Log growth, Board latency, verdict cadence and false flags over the run; it does not measure detection accuracy (that is `station-watch evaluate`).
+
 Reproduce:
 
 ```

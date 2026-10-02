@@ -71,7 +71,11 @@ def add_parser(sub) -> None:
 
 
 def _runner_argv(args) -> list[str]:
-    """The ``run`` child argv for a recorded ``--source`` soak."""
+    """The ``run`` child argv for a recorded ``--source`` soak.
+
+    ``--no-evidence``, like the ``--synthetic-loop`` child: both soak modes measure
+    the same pipeline, and an hours-long soak does not fill the evidence dir.
+    """
     return [
         sys.executable,
         "-m",
@@ -83,6 +87,7 @@ def _runner_argv(args) -> list[str]:
         str(args.source),
         "--log",
         args.log,
+        "--no-evidence",
     ]
 
 

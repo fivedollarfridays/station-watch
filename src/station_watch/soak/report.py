@@ -54,6 +54,14 @@ def _metric_rows(metrics: dict) -> list[tuple[str, str]]:
     return rows
 
 
+# What a soak pass attests, so it is not over-read as detection accuracy.
+_SCOPE = (
+    "A pass covers memory and Log growth, Board latency, verdict cadence and false "
+    "flags over the run; it does not measure detection accuracy (that is "
+    "`station-watch evaluate`)."
+)
+
+
 def render_table(provenance: dict, metrics: dict, command: str) -> str:
     """The markdown table for a soak run: heading, reproduce command, one row per metric."""
     kind = provenance["dataset_kind"]
@@ -64,6 +72,8 @@ def render_table(provenance: dict, metrics: dict, command: str) -> str:
         f"- status: **{metrics.get('status', 'unknown')}**",
         f"- git commit: `{provenance['git_commit']}`",
         f"- detector: `{provenance['detector']}`",
+        "",
+        _SCOPE,
         "",
         "Reproduce:",
         "",
