@@ -367,10 +367,18 @@ def test_git_tracks_nothing_under_an_evidence_or_audit_dir():
     tracked = subprocess.run(
         ["git", "ls-files"], cwd=repo, capture_output=True, text=True, check=True
     ).stdout.splitlines()
-    offenders = [
-        p
-        for p in tracked
-        if any(part in ("evidence", "audit") for part in Path(p).parts)
-        or p.startswith("data/local/")
-    ]
+    # Evidence thumbnails and audit sheets are *output*: they always land under
+    # data/local/ (the run/audit defaults), which is gitignored. A stray evidence/
+    # or audit/ *output* dir written elsewhere is still caught -- but the audit
+    # command's own source package (src/station_watch/audit/) and its tests are
+    # legitimate code, not output, so the code trees are exempt from the name check.
+    def is_offender(p: str) -> bool:
+        if p.startswith("data/local/"):
+            return True
+        parts = Path(p).parts
+        if parts[:1] in (("src",), ("tests",)):
+            return False
+        return any(part in ("evidence", "audit") for part in parts)
+
+    offenders = [p for p in tracked if is_offender(p)]
     assert offenders == [], f"evidence/audit output must never be committed; found {offenders}"
