@@ -42,7 +42,7 @@ This lane also closes the P2 findings left open in the PR #5 and PR #6 review di
 
 ---
 
-## Phase 1: Carry-over fixes the rest of the lane builds on
+## Part 1: Carry-over fixes the rest of the lane builds on
 
 ### HF3.1 — Pipeline carry-overs: ArUco once per frame, stall window default, measure errors, motion mask, per-clip backends | Cx: 4 | P1
 
@@ -84,7 +84,7 @@ This lane also closes the P2 findings left open in the PR #5 and PR #6 review di
 **Depends on:** None
 **Model:** claude-opus-4-8
 
-## Phase 2: Session QA and evidence
+## Part 2: Session QA and evidence
 
 ### HF3.3 — Session QA: a per-session unknown budget a mostly blind session cannot pass | Cx: 3 | P0
 
@@ -134,7 +134,7 @@ This lane also closes the P2 findings left open in the PR #5 and PR #6 review di
 **Depends on:** HF3.1
 **Model:** claude-opus-4-8
 
-## Phase 3: Audit, reviewed precision and false-alarm rate
+## Part 3: Audit, reviewed precision and false-alarm rate
 
 ### HF3.5 — `station-watch audit build`: a proof sheet for every flag | Cx: 4 | P0
 
@@ -211,7 +211,7 @@ This lane also closes the P2 findings left open in the PR #5 and PR #6 review di
 **Depends on:** HF3.6
 **Model:** claude-opus-4-8
 
-## Phase 4: Held-out evaluation
+## Part 4: Held-out evaluation
 
 ### HF3.8 — Manifest split and the calibration provenance check | Cx: 4 | P0
 
@@ -252,7 +252,7 @@ This lane also closes the P2 findings left open in the PR #5 and PR #6 review di
 **Depends on:** HF3.8, HF3.1, HF3.3
 **Model:** claude-opus-4-8
 
-## Phase 5: Soak
+## Part 5: Soak
 
 ### HF3.10 — `station-watch soak` on a real source: sampler, growth verdict and supervisor | Cx: 5 | P1
 
@@ -297,7 +297,7 @@ This lane also closes the P2 findings left open in the PR #5 and PR #6 review di
 **Depends on:** HF3.10
 **Model:** claude-opus-4-8
 
-## Phase 6: Demo readiness
+## Part 6: Demo readiness
 
 ### HF3.12 — `station-watch preflight`: PASS or FAIL per item before going live | Cx: 4 | P0
 
@@ -361,7 +361,7 @@ This lane also closes the P2 findings left open in the PR #5 and PR #6 review di
 **Depends on:** HF3.2
 **Model:** claude-opus-4-8
 
-## Phase 7: Per-slot detail checks (PLAN HF3)
+## Part 7: Per-slot detail checks (PLAN HF3)
 
 ### HF3.15 — Torque stripe end to end: reader, renderer and the live Detect path | Cx: 5 | P1
 
@@ -427,7 +427,7 @@ This lane also closes the P2 findings left open in the PR #5 and PR #6 review di
 **Depends on:** HF3.12, HF3.13, HF3.6, HF3.15
 **Model:** claude-opus-4-8
 
-## Phase 8: Wire it
+## Part 8: Wire it
 
 ### HF3.18 — Wiring, README "Run it", CI | Cx: 2 | P0
 
