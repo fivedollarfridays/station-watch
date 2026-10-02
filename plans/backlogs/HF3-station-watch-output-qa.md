@@ -233,7 +233,7 @@ This lane also closes the P2 findings left open in the PR #5 and PR #6 review di
 
 ### HF3.9 — Calibration hygiene and the held-out claims rule | Cx: 3 | P0
 
-**Description:** Three fixes that keep held-out numbers honest. (1) `step_times.json` is computed only from calibration-split clips labeled as normal work (no `stalls`, `keepouts`, `camera_faults` or `creeps` intervals), closing the PR #5 P2 where fault clips biased the stall window; its provenance records `step_clips` (the count used). With no normal calibration clips, `step_times.json` is not written and the CLI says why. (2) A real (non-synthetic) `evaluate` without `--out` exits 2 naming `--out`, closing the PR #5 P2 where real runs overwrote each other in `measurements/`. (3) Extend `tests/test_claims.py`: when any committed file under `measurements/` has `provenance.dataset_kind == "real"` and `provenance.split == "held_out"`, every README claim in "Measured performance" whose key is a flag `precision` or `recall` (`metrics.<flag>.precision|recall`) must cite a held-out file, a claim citing a calibration-split real file for those keys fails naming it, and the section must contain the words "held-out". Until a held-out file exists the existing rules apply unchanged. Add tests of the test using temp measurement trees, as the existing claims tests do.
+**Description:** Three fixes that keep held-out numbers honest. (1) `step_times.json` is computed only from calibration-split clips labeled as normal work (no `stalls`, `keepouts`, `camera_faults` or `creeps` intervals), closing the PR #5 P2 where fault clips biased the stall window; its provenance records `step_clips` (the count used). With no normal calibration clips, `step_times.json` is not written and the CLI says why. (2) A real (non-synthetic) `evaluate` without `--out` exits 2 naming `--out`, closing the PR #5 P2 where real runs overwrote each other in `measurements/`; every `evaluate --out` (real and synthetic) is resolved through HF3.3's `confine_out` (`--force-out` to override), so evaluate follows the same Output confinement rule as every other measurement writer. (3) Extend `tests/test_claims.py`: when any committed file under `measurements/` has `provenance.dataset_kind == "real"` and `provenance.split == "held_out"`, every README claim in "Measured performance" whose key is a flag `precision` or `recall` (`metrics.<flag>.precision|recall`) must cite a held-out file, a claim citing a calibration-split real file for those keys fails naming it, and the section must contain the words "held-out". Until a held-out file exists the existing rules apply unchanged. Add tests of the test using temp measurement trees, as the existing claims tests do.
 
 **Interface:**
 - Consumes HF3.8's provenance fields: `split` (`calibration|held_out`), `clip_sha256s`, `recorded_on`, `dataset_kind`; and `ClipLabel.split` plus the labeled interval lists (`stalls`, `keepouts`, `camera_faults`, `creeps`) to pick normal clips.
@@ -249,7 +249,7 @@ This lane also closes the P2 findings left open in the PR #5 and PR #6 review di
 
 **Closes on Kevin's clips (not an engage AC):** README precision and recall cite `measurements/v2/` held-out numbers, labeled held-out, once v2 is evaluated.
 
-**Depends on:** HF3.8, HF3.1
+**Depends on:** HF3.8, HF3.1, HF3.3
 **Model:** claude-opus-4-8
 
 ## Phase 5: Soak
