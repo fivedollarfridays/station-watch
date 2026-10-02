@@ -80,10 +80,12 @@ camera:
   gimbal: true
 ```
 
-With `camera.gimbal: true`, the `camera_stability` check always reports **WARN** —
+With `camera.gimbal: true` and the camera open, the `camera_stability` check always reports **WARN** —
 "a gimbal can drift and raise view_shifted; lock it before going live" — as a standing
 reminder to lock it before a production run. It still samples the fiducial for
-`--drift-s` seconds, so the WARN line also carries the measured drift.
+`--drift-s` seconds, so the WARN line also carries the measured drift. If the config did not
+load or the camera never opened, the check is a **FAIL** (the gimbal reminder rides
+along in its detail), never a WARN.
 
 The exact on-device menu names for webcam mode and gimbal lock are **not yet confirmed
 on the hardware**, so the device-level steps below are marked `unverified`. Do not

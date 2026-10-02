@@ -112,9 +112,8 @@ def frame_from_clip(
     ``not_in_clip`` (the clip is shorter) or ``fingerprint_mismatch`` otherwise.
     """
     # Imported lazily so loading this read-side module never pulls in the whole
-    # capture package (its __init__ imports Capture, which imports the evidence
-    # store, which imports this module -- a cycle that only resolves when capture
-    # is loaded first). A reader-only consumer (HF3.5 audit) never touches capture.
+    # capture package (OpenCV capture, threads) for a reader-only consumer such as
+    # the HF3.5 audit.
     from station_watch.capture.metrics import fingerprint as _fingerprint
 
     cap = cv2.VideoCapture(str(clip_path))

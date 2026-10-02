@@ -57,7 +57,7 @@ Go only on `PREFLIGHT PASS`. Each FAIL means:
 - **fiducial**: the marker was not found, or sits off its configured position. Clear the
   view or re-seat the marker.
 - **camera_stability**: a WARN, not a FAIL, when the marker drifts or a gimbal is
-  configured; lock the mount or the gimbal. It FAILs only when the camera never opened.
+  configured; lock the mount or the gimbal. It FAILs when the config did not load or the camera never opened.
 - **model_weights**: keep-out zones are configured but the weights are missing or fail
   their hash. Run `station-watch fetch-model` (needs the network, so do it at home).
 - **log_writable**: the Log's directory is missing or not writable. Create it or fix
@@ -220,6 +220,8 @@ station-watch audit build --config config/station.yaml --log data/local/demo.db
 ```
 station-watch audit review --audit data/local/audit/demo
 ```
+
+Open the sign-in URL it prints on stderr; the review page is refused without it.
 
 Then score the reviewed flags:
 
