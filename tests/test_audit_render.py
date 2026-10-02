@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import sys
 from html.parser import HTMLParser
+from pathlib import Path
 
 import numpy as np
 
 from station_watch.audit.flags import AuditFlag
 from station_watch.audit.html import FrameCell, esc, render_sheet
 from station_watch.audit.overlay import collect_regions, draw_overlay
+
+sys.path.insert(0, str(Path(__file__).parent))
+from helpers.records import health_config  # noqa: E402
 
 SCRIPT = "<script>alert(1)</script>"
 IMG = '"><img src=x onerror=alert(1)>'
@@ -96,8 +101,6 @@ def test_a_frame_without_a_marker_says_overlay_unavailable_but_still_shows_the_i
 
 
 def _config():
-    from tests.helpers.records import health_config
-
     return health_config(
         required_slots=["rail_pos_1"],
         detect={
