@@ -113,3 +113,14 @@ def test_deeply_nested_json_body_is_a_400(port):
     assert _status(_raw(port, "POST /verdict HTTP/1.1", headers, body)) == 400
     ok = json.dumps({"flag_id": FID, "verdict": "correct"}).encode()
     assert _status(_raw(port, "POST /verdict HTTP/1.1", headers, ok)) == 200
+
+
+def test_help_text_states_the_token_gate_exactly():
+    from station_watch.cli import build_parser
+
+    sub = build_parser()._subparsers._group_actions[0].choices["audit"]
+    review = sub._subparsers._group_actions[0].choices["review"]
+    text = " ".join(review.description.split())
+    assert "The page and every mark need the session token" in text
+    assert "without it the page is 401, with a wrong one 403" in text
+    assert "printed once on stderr" in text
