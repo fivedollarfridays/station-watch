@@ -74,6 +74,9 @@ class FrameRecord(Serde):
     mean_luma: float
     noise_score: float
     run_id: str
+    # Whether the fiducial marker was found in this frame; None when the producer
+    # does not report it (rows written before Capture stamped it).
+    marker_found: bool | None = None
     record_id: str = ""
 
     def __post_init__(self) -> None:

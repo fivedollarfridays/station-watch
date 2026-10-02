@@ -103,7 +103,9 @@ class Capture:
         fps = self._fps_override if self._fps_override is not None else self._source.fps
         return 1.0 / fps if fps > 0 else 0.0
 
-    def _record(self, frame: np.ndarray, frame_id: int, mono: float) -> FrameRecord:
+    def _record(
+        self, frame: np.ndarray, frame_id: int, mono: float, marker_found: bool | None = None
+    ) -> FrameRecord:
         prev = self._prev
         return FrameRecord(
             station_id=self._station_id,
@@ -115,6 +117,7 @@ class Capture:
             mean_luma=mean_luma(frame),
             noise_score=noise_score(frame, prev),
             run_id=self._run_id,
+            marker_found=marker_found,
         )
 
     def frames(self) -> Iterator[FrameRecord]:
@@ -229,12 +232,13 @@ class Capture:
         self, log, watch: BlindWatch, fiducial: dict, frame: np.ndarray, frame_id: int, mono: float
     ) -> None:
         """Stamp, log, and fan one frame out to the watch (may raise; the caller guards)."""
-        record = self._record(frame, frame_id, mono)
+        # Find the marker once per frame; stamp the frame with the result (the Judge
+        # never calls a never-seen marker healthy), derive the blind-watch center
+        # from its corners, and hand the same corners to Detect (K12).
+        corners = find_marker_corners(frame, fiducial["dictionary_id"], fiducial["marker_id"])
+        record = self._record(frame, frame_id, mono, marker_found=corners is not None)
         log.append(record)
         self.first_frame.set()
-        # Find the marker once per frame; derive the blind-watch center from its
-        # corners and hand the same corners to Detect (K12, no double detection).
-        corners = find_marker_corners(frame, fiducial["dictionary_id"], fiducial["marker_id"])
         watch.observe_frame(record, marker_center(corners))
         had_observation = False
         if self._detect is not None:

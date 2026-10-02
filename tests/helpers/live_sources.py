@@ -14,9 +14,17 @@ import time
 
 import numpy as np
 
+from station_watch.synth.video import _marker_tile
+
 
 def bright_frame(rng: np.random.Generator) -> np.ndarray:
+    """A lit 120x120 scene with the fiducial in view (centre (40, 40)), plus noise.
+
+    A real station camera always has its marker in view; the Judge never calls a
+    run healthy before a frame has seen it, so a fake live camera shows it too.
+    """
     scene = np.full((120, 120, 3), 200, np.uint8)
+    scene[20:60, 20:60] = _marker_tile(40)
     noisy = scene.astype(float) + rng.normal(0, 8, scene.shape)
     return np.clip(noisy, 0, 255).astype(np.uint8)
 

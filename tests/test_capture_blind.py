@@ -19,6 +19,7 @@ from station_watch.log import Log
 from station_watch.records import BlindReason, BlindState
 
 sys.path.insert(0, str(Path(__file__).parent))
+from helpers.live_sources import bright_frame  # noqa: E402
 from helpers.synth_video import write_synth_clip  # noqa: E402
 
 STATION = "ST1"
@@ -247,8 +248,7 @@ def test_view_shifted_opens_then_clears_after_recovery(tmp_path):
 
 
 def _bright_frame(rng) -> np.ndarray:
-    scene = np.full((120, 120, 3), 200, np.uint8)
-    return np.clip(scene.astype(float) + rng.normal(0, 8, scene.shape), 0, 255).astype(np.uint8)
+    return bright_frame(rng)  # lit, with the fiducial in view (helpers.live_sources)
 
 
 class _HungSource:

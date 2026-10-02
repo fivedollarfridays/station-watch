@@ -16,8 +16,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import yaml
-
 from station_watch.synth.video import write_synth_clip
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,20 +27,6 @@ TIMINGS = ("launch_to_first_frame_s", "launch_to_first_verdict_s", "launch_to_fi
 def _entry_point() -> list[str]:
     script = Path(sys.executable).parent / "station-watch"
     return [str(script)] if script.exists() else [sys.executable, "-m", "station_watch"]
-
-
-def _never_healthy_config(tmp_path: Path) -> Path:
-    """The example config with a fiducial window shorter than one cycle.
-
-    With the shipped 1.0 s window the marker-missing blind opens at about the same
-    instant as the first verdict, which can then still read healthy; at 0.2 s the
-    blind is open before the first verdict, so a marker-less clip is never healthy.
-    """
-    data = yaml.safe_load(CONFIG.read_text())
-    data["fiducial"]["window_s"] = 0.2
-    cfg = tmp_path / "never-healthy.yaml"
-    cfg.write_text(yaml.safe_dump(data))
-    return cfg
 
 
 def _cold_start(
@@ -92,7 +76,6 @@ def test_cold_start_on_a_clip_that_never_turns_healthy_writes_no_metrics(tmp_pat
         OUT_REL,
         "--timeout-s",
         "30",
-        config=_never_healthy_config(tmp_path),
     )
     assert result.returncode == 1, result.stdout + result.stderr
     data = json.loads((tmp_path / OUT_REL).read_text())
@@ -151,7 +134,6 @@ def test_rows_from_an_earlier_run_in_the_same_log_do_not_count(tmp_path):
         OUT_REL,
         "--timeout-s",
         "30",
-        config=_never_healthy_config(tmp_path),
     )
     assert result.returncode == 1, result.stdout + result.stderr
     assert json.loads((tmp_path / OUT_REL).read_text())["status"] == "no_healthy_verdict"

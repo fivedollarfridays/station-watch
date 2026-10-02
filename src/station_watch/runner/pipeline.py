@@ -91,7 +91,7 @@ class Runner:
         )
         # The effective window the Judge resolved (a context with no window falls
         # back to takt_s + grace_s); used for the startup banner below.
-        self._stall_window_s = self._judge._stall_window
+        self._stall_window_s = self._judge.stall_window_s
         self._alarm = Alarm(self._config, run_id=run_id, sinks=context.sinks, clock=clock)
 
     def stop(self) -> None:
