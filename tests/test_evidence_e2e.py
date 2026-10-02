@@ -132,11 +132,16 @@ def test_every_cited_frame_resolves_to_a_file_with_the_logs_fingerprint(tmp_path
 
     result = _run_cli(
         "run",
-        "--config", str(config),
-        "--source", str(clip),
-        "--log", str(logdb),
-        "--alarm-record", str(tmp_path / "alarm.jsonl"),
-        "--evidence-dir", str(evidence_dir),
+        "--config",
+        str(config),
+        "--source",
+        str(clip),
+        "--log",
+        str(logdb),
+        "--alarm-record",
+        str(tmp_path / "alarm.jsonl"),
+        "--evidence-dir",
+        str(evidence_dir),
     )
     assert result.returncode == 0, result.stderr
 
@@ -271,9 +276,7 @@ def _run_in_process(tmp_path, clip, config_path, *, evidence_dir, tag=""):
     return logdb, record
 
 
-def test_a_broken_evidence_writer_leaves_the_run_identical_and_reports_once(
-    tmp_path, monkeypatch
-):
+def test_a_broken_evidence_writer_leaves_the_run_identical_and_reports_once(tmp_path, monkeypatch):
     cfg = tmp_path / "station.yaml"
     _write_config(cfg)
     clip, _t = write_synth_station_clip(
@@ -310,7 +313,12 @@ def test_a_broken_evidence_writer_leaves_the_run_identical_and_reports_once(
         tmp_path, clip, cfg, evidence_dir=str(tmp_path / "evidence"), tag="_on"
     )
 
-    assert _verdict_content(on_log) == _verdict_content(off_log), "verdicts must be unchanged"
+    # Same verdicts (state, faults, cited frames) in both runs. The two runs are
+    # independent wall-clock runs, so how many cycles each fits in can differ by one
+    # under load; compare the distinct verdict content, not the per-cycle counts.
+    assert set(_verdict_content(on_log)) == set(_verdict_content(off_log)), (
+        "verdicts must be unchanged"
+    )
     assert _alarm_causes(on_rec) == _alarm_causes(off_rec), "alarms must be unchanged"
     assert _cycle_count(on_log) > 0 and _cycle_count(off_log) > 0, "both runs record cycles"
 
@@ -335,11 +343,16 @@ def test_no_evidence_writes_nothing_under_the_evidence_dir(tmp_path):
 
     result = _run_cli(
         "run",
-        "--config", str(config),
-        "--source", str(clip),
-        "--log", str(tmp_path / "log.db"),
-        "--alarm-record", str(tmp_path / "alarm.jsonl"),
-        "--evidence-dir", str(evidence_dir),
+        "--config",
+        str(config),
+        "--source",
+        str(clip),
+        "--log",
+        str(tmp_path / "log.db"),
+        "--alarm-record",
+        str(tmp_path / "alarm.jsonl"),
+        "--evidence-dir",
+        str(evidence_dir),
         "--no-evidence",
     )
     assert result.returncode == 0, result.stderr
@@ -367,6 +380,7 @@ def test_git_tracks_nothing_under_an_evidence_or_audit_dir():
     tracked = subprocess.run(
         ["git", "ls-files"], cwd=repo, capture_output=True, text=True, check=True
     ).stdout.splitlines()
+
     # Evidence thumbnails and audit sheets are *output*: they always land under
     # data/local/ (the run/audit defaults), which is gitignored. A stray evidence/
     # or audit/ *output* dir written elsewhere is still caught -- but the audit

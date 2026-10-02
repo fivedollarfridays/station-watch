@@ -29,14 +29,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     _add_run_parser(sub)
     _add_watchdog_parser(sub)
-    _add_fetch_model_parser(sub)
     for module in _lazy_commands().values():
         module.add_parser(sub)
     return parser
 
 
 def _lazy_commands() -> dict:
-    """The evaluate/board/drill/measure/qa/audit subcommand modules, each imported once.
+    """The subcommand modules beside run/watchdog, each imported once.
 
     Their arg wiring lives beside their own logic; importing the (argparse-only)
     modules here lets the parser know them while the heavy work (OpenCV, renderers,
@@ -44,6 +43,7 @@ def _lazy_commands() -> dict:
     """
     import station_watch.audit.commandline as audit
     import station_watch.board.commandline as board
+    import station_watch.detect.fetch_commandline as fetch_model
     import station_watch.drill.commandline as drill
     import station_watch.evaluate.commandline as evaluate
     import station_watch.physics.commandline as measure
@@ -52,6 +52,7 @@ def _lazy_commands() -> dict:
     import station_watch.soak.commandline as soak
 
     return {
+        "fetch-model": fetch_model,
         "evaluate": evaluate,
         "board": board,
         "drill": drill,
@@ -152,39 +153,6 @@ def _add_watchdog_parser(sub) -> None:
     )
 
 
-def _add_fetch_model_parser(sub) -> None:
-    fetch = sub.add_parser(
-        "fetch-model",
-        help="download the keep-out person model (Apache-2.0 YOLOX) and verify its hash",
-        description="Download the YOLOX-Nano ONNX weights (Apache-2.0) from the official "
-        "release into data/local/models/ and verify the SHA-256. This is the only network "
-        "call in the package; `run` never makes it. Weights are never committed.",
-    )
-    fetch.add_argument(
-        "--dest",
-        help="where to write the weights (default: data/local/models/yolox_nano.onnx)",
-    )
-
-
-def _fetch_model(args) -> int:
-    from station_watch.detect.fetch import fetch_model
-    from station_watch.detect.yolox import (
-        MODEL_LICENSE,
-        MODEL_NAME,
-        MODEL_SOURCE_URL,
-        WeightsError,
-    )
-
-    print(f"station-watch: fetching {MODEL_NAME} ({MODEL_LICENSE}) from {MODEL_SOURCE_URL}")
-    try:
-        path = fetch_model(args.dest)
-    except (WeightsError, OSError) as exc:
-        print(f"station-watch: fetch-model failed: {exc}", file=sys.stderr)
-        return 1
-    print(f"station-watch: verified weights written to {path}")
-    return 0
-
-
 def _run(args) -> int:
     try:
         context = build_context(
@@ -238,8 +206,6 @@ def main(argv: list[str] | None = None) -> int:
         return _run(args)
     if args.command == "watchdog":
         return _watchdog(args)
-    if args.command == "fetch-model":
-        return _fetch_model(args)
     # The lazy subcommands dispatch to their sibling `commandline.handle`; the modules
     # were already imported when `build_parser` wired their args, so this is free.
     commands = _lazy_commands()

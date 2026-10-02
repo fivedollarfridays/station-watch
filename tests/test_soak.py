@@ -277,11 +277,25 @@ def test_out_outside_confined_dir_exits_nonzero_naming_rule(tmp_path):
     cfg = _soak_config(tmp_path)
     result = subprocess.run(
         [
-            *_entry_point(), "soak", "--config", str(cfg), "--log", str(log),
-            "--out", "outside.json", "--dataset-kind", "synthetic",
-            "--source", str(log), "--minutes", "0.1",
+            *_entry_point(),
+            "soak",
+            "--config",
+            str(cfg),
+            "--log",
+            str(log),
+            "--out",
+            "outside.json",
+            "--dataset-kind",
+            "synthetic",
+            "--source",
+            str(log),
+            "--minutes",
+            "0.1",
         ],
-        cwd=tmp_path, capture_output=True, text=True, timeout=60,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     assert result.returncode != 0, result.stdout
     assert "must be written inside" in result.stderr
@@ -300,11 +314,16 @@ def test_e2e_real_soak_starts_children_samples_stops_and_passes(tmp_path):
 
     result = subprocess.run(
         [
-            *_entry_point(), "soak", "--config", str(cfg), "--log", str(tmp_path / "soak.db"),
-            "--out", out_rel, "--dataset-kind", "synthetic", "--source", str(clip),
-            "--minutes", "0.5", "--sample-s", "3", "--board-port", str(port),
+            *_entry_point(),
+            "soak",
+            *("--config", str(cfg), "--log", str(tmp_path / "soak.db")),
+            *("--out", out_rel, "--dataset-kind", "synthetic", "--source", str(clip)),
+            *("--minutes", "0.5", "--sample-s", "3", "--board-port", str(port)),
         ],
-        cwd=tmp_path, capture_output=True, text=True, timeout=180,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=180,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 

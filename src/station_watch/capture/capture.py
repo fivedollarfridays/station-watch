@@ -39,10 +39,9 @@ from station_watch.capture.blind import BlindThresholds, BlindWatch
 from station_watch.capture.metrics import fingerprint, mean_luma, noise_score
 from station_watch.capture.resilience import (
     DetectStep,
-    error_detail,
     liveness_loop,
+    record_frame_failure,
     reopen_source,
-    report,
 )
 from station_watch.capture.source import FrameSource
 from station_watch.clock import utc_now_iso
@@ -255,14 +254,7 @@ class Capture:
     def _frame_failed(self, watch: BlindWatch, exc: Exception, frame_id: int) -> None:
         """Record a per-frame processing error as ``disconnected``; report it once."""
         self._prev = None
-        detail = error_detail(exc)
-        try:
-            opened = watch.read_failed({"error": detail})
-        except Exception as record_exc:  # the Log itself may be what is failing
-            detail = f"{detail} (and could not record it: {record_exc!r})"
-            opened = True
-        if opened:
-            report(f"capture frame {frame_id} processing failed: {detail}")
+        record_frame_failure(watch, exc, frame_id)
 
     def _read(self) -> tuple[np.ndarray | None, Exception | None]:
         """One read; K10: a read that raises is unobservable, never a crash."""

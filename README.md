@@ -91,6 +91,78 @@ station-watch board --config config/station-example.yaml --log station.db
 station-watch board --config config/station-example.yaml --log station.db --once
 ```
 
+Every `run` keeps a small thumbnail of each frame a flag can cite, under `data/local/evidence` (gitignored) by default. Point it elsewhere with `--evidence-dir`, or turn it off with `--no-evidence`; evidence only observes, so an evidence dir that cannot be written never stops the watch:
+
+```bash
+station-watch run --config config/station-example.yaml --source 0 --log station.db --evidence-dir data/local/evidence
+```
+
+```bash
+station-watch run --config config/station-example.yaml --source clip.mkv --log station.db --no-evidence
+```
+
+Before going live, run the preflight. It prints PASS, FAIL, WARN or SKIP per check (config, camera, live frames, fiducial, camera stability, keep-out weights, Log, disk, clock, alarm sinks, Board) and exits 0 only when nothing FAILs. It reads the camera and the Log and writes nothing but a probe file it removes; a camera that will not open is a `camera FAIL` naming the index, never a crash:
+
+```bash
+station-watch preflight --config config/station-example.yaml --source 0 --log station.db --board-port 8765
+```
+
+Find which device index is your webcam (OpenCV's order differs between machines). It lists each index that opens with its resolution and fps, prints "no cameras opened" when none do, and always exits 0. See [docs/CAMERAS.md](docs/CAMERAS.md) for webcam and DJI Pocket setup:
+
+```bash
+station-watch preflight --list-cameras --max-index 5
+```
+
+Measure the cold start: launch `run`, time the first frame, first verdict and first healthy verdict, and write a measurement file under the dataset kind's tree. With no healthy verdict before `--timeout-s` it writes `status: no_healthy_verdict` and no numbers:
+
+```bash
+station-watch preflight --cold-start --config config/station-example.yaml --source 0 --log cold.db --out measurements/v1/cold_start.json --dataset-kind real
+```
+
+The demo-day run-of-show (setup, preflight, each demo beat and how it recovers, backup plans) is [docs/DEMO.md](docs/DEMO.md).
+
+Check one session's quality with QA. It reads the Log read-only, time-weights how much of the session was unobservable, and passes only within the config's `qa:` thresholds (exit 0 pass, 1 fail); a config with no `qa.max_unknown_fraction` refuses to start, naming the key:
+
+```bash
+station-watch qa --config config/station-example.yaml --log station.db
+```
+
+Audit every flag a session raised. `build` writes `flags.json` and a self-contained proof sheet (`index.html`) under `data/local/audit/<log name>/`, showing the exact frames each flag cites ("no flags in this session" when there are none). `review` serves that sheet on loopback with a correct/incorrect control per flag, and `mark` records one verdict without a browser. The Log is never written:
+
+```bash
+station-watch audit build --config config/station-example.yaml --log station.db
+```
+
+```bash
+station-watch audit review --audit data/local/audit/station
+```
+
+```bash
+station-watch audit mark --audit data/local/audit/station run-1:missing_part:rail_pos_1:7 correct
+```
+
+Score the reviewed flags into reviewed precision, and turn the reviewed false flags into a false-alarm rate per hour of normal operation. A session that fails QA writes `status: qa_failed`; no reviewed flags writes `status: no_reviewed_flags`; too little observed time for a rate writes `status: insufficient_duration`. None of them write numbers:
+
+```bash
+station-watch audit score --audit data/local/audit/station --config config/station-example.yaml --log station.db --dataset-kind real --out measurements/v1/precision.json
+```
+
+```bash
+station-watch audit rate --audit data/local/audit/station --config config/station-example.yaml --log station.db --dataset-kind real --out measurements/v1/false_alarm_rate.json
+```
+
+Soak the pipeline for hours. `soak` starts the real `run`, `watchdog` and `board` children against one Log, samples memory, Log growth, Board latency and verdict cadence, and judges growth against the config's `soak:` thresholds plus session QA (exit 0 only on a clean soak). `--synthetic-loop` feeds a looping normal-work source, so every fault it raises is a false flag; too few samples reports `insufficient_samples`, never a pass:
+
+```bash
+station-watch soak --config measurements/synthetic/soak-config.yaml --log soak.db --synthetic-loop --hours 2 --dataset-kind synthetic --out measurements/synthetic/soak.json
+```
+
+Score the held-out clip set. `--split held_out` first checks that the thresholds were not calibrated on any held-out clip and refuses a leaked manifest; with no manifest it reports "no labeled set present", writes nothing and exits non-zero:
+
+```bash
+station-watch evaluate --config config/station-example.yaml --manifest clips/manifest.yaml --split held_out --out measurements/v2
+```
+
 ## Design principles
 
 These are ideas carried over from patterns run in production, rewritten fresh for a plant floor. No code is imported.

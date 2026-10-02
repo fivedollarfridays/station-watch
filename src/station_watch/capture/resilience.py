@@ -47,6 +47,22 @@ def reopen_source(source) -> None:
         pass
 
 
+def record_frame_failure(watch, exc: BaseException, frame_id: int) -> None:
+    """Record a per-frame processing error as ``disconnected``; report it once.
+
+    The Log itself may be what is failing, so a failure to record is folded into the
+    reported detail rather than raised (K5: the watch never dies on a bad frame).
+    """
+    detail = error_detail(exc)
+    try:
+        opened = watch.read_failed({"error": detail})
+    except Exception as record_exc:
+        detail = f"{detail} (and could not record it: {record_exc!r})"
+        opened = True
+    if opened:
+        report(f"capture frame {frame_id} processing failed: {detail}")
+
+
 def liveness_loop(
     watch: BlindWatch,
     stop_event: threading.Event,
@@ -94,4 +110,11 @@ class DetectStep:
         return len(observations)
 
 
-__all__ = ["DetectStep", "error_detail", "liveness_loop", "reopen_source", "report"]
+__all__ = [
+    "DetectStep",
+    "error_detail",
+    "liveness_loop",
+    "record_frame_failure",
+    "reopen_source",
+    "report",
+]

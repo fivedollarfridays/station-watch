@@ -269,7 +269,7 @@ def _internal_import_targets(file: Path) -> set[str]:
     return targets
 
 
-def test_every_module_is_reached_from_a_run_watchdog_drill_measure_or_board_entry():
+def test_every_module_is_reached_from_a_cli_entry():
     pkg = Path(__file__).resolve().parent.parent / "src" / "station_watch"
     files = [f for f in pkg.rglob("*.py") if "__pycache__" not in f.parts]
     modules = {_module_name(pkg, f): f for f in files}
@@ -295,9 +295,13 @@ def test_every_module_is_reached_from_a_run_watchdog_drill_measure_or_board_entr
                 if ancestor in modules and ancestor not in reached:
                     frontier.add(ancestor)
 
-    # The HF3A entry points and their module trees are part of the live command
-    # surface, not dead code: each must be reachable from the CLI (HF3A.7).
+    # Every subcommand's entry module is part of the live command surface, not dead
+    # code: run, watchdog, evaluate, drill, measure, board, qa, audit, soak and
+    # preflight must each be reachable from the CLI.
     for entry in (
+        "station_watch.runner.pipeline",
+        "station_watch.watchdog",
+        "station_watch.evaluate.commandline",
         "station_watch.drill.commandline",
         "station_watch.physics.commandline",
         "station_watch.board.commandline",

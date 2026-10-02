@@ -97,8 +97,14 @@ def test_held_out_clip_with_calibration_bytes_exits_leak_naming_the_clip(tmp_pat
     config = _config(tmp_path / "c.yaml", provenance=[cal])
     manifest = _manifest(
         tmp_path / "m.yaml",
-        [{"id": "h", "split": "held_out", "recorded_on": "2026-10-20",
-          "clips": [{"path": "held/reused.mkv"}]}],
+        [
+            {
+                "id": "h",
+                "split": "held_out",
+                "recorded_on": "2026-10-20",
+                "clips": [{"path": "held/reused.mkv"}],
+            }
+        ],
     )
     rc, out_dir = _held_out(tmp_path, config=config, manifest=manifest, clips_dir=clips)
     assert rc == EXIT_CALIBRATION_LEAK and rc != 0
@@ -113,8 +119,14 @@ def test_shared_session_id_exits_leak_naming_the_session(tmp_path, capsys):
     config = _config(tmp_path / "c.yaml", provenance=[cal])
     manifest = _manifest(
         tmp_path / "m.yaml",
-        [{"id": "shared", "split": "held_out", "recorded_on": "2026-10-20",
-          "clips": [{"path": "h/a.mkv"}]}],
+        [
+            {
+                "id": "shared",
+                "split": "held_out",
+                "recorded_on": "2026-10-20",
+                "clips": [{"path": "h/a.mkv"}],
+            }
+        ],
     )
     rc, _ = _held_out(tmp_path, config=config, manifest=manifest, clips_dir=clips)
     assert rc == EXIT_CALIBRATION_LEAK
@@ -144,8 +156,14 @@ def test_calibration_file_missing_hashes_or_dates_exits_leak(tmp_path, capsys, m
     config = _config(tmp_path / "c.yaml", provenance=[cal])
     manifest = _manifest(
         tmp_path / "m.yaml",
-        [{"id": "h", "split": "held_out", "recorded_on": "2026-10-20",
-          "clips": [{"path": "h/a.mkv"}]}],
+        [
+            {
+                "id": "h",
+                "split": "held_out",
+                "recorded_on": "2026-10-20",
+                "clips": [{"path": "h/a.mkv"}],
+            }
+        ],
     )
     rc, out_dir = _held_out(tmp_path, config=config, manifest=manifest, clips_dir=clips)
     assert rc == EXIT_CALIBRATION_LEAK
@@ -170,8 +188,14 @@ def _cross_manifest_setup(tmp_path, held_date):
     config = _config(tmp_path / "c.yaml", step_times_path=cal)
     manifest = _manifest(
         tmp_path / "B.yaml",
-        [{"id": "sessB", "split": "held_out", "recorded_on": held_date,
-          "clips": [{"path": "b/fresh.mkv"}]}],
+        [
+            {
+                "id": "sessB",
+                "split": "held_out",
+                "recorded_on": held_date,
+                "clips": [{"path": "b/fresh.mkv"}],
+            }
+        ],
     )
     return clips, config, manifest
 
@@ -199,8 +223,14 @@ def test_no_calibration_provenance_configured_returns_none(tmp_path):
     config = _config(tmp_path / "c.yaml")  # names no provenance at all
     manifest = _manifest(
         tmp_path / "m.yaml",
-        [{"id": "h", "split": "held_out", "recorded_on": "2026-10-20",
-          "clips": [{"path": "h/a.mkv"}]}],
+        [
+            {
+                "id": "h",
+                "split": "held_out",
+                "recorded_on": "2026-10-20",
+                "clips": [{"path": "h/a.mkv"}],
+            }
+        ],
     )
     assert held_out_calibration(str(config), load_manifest(str(manifest), clips)) == "none"
 
@@ -230,17 +260,38 @@ def _render(clips_dir, session, name, frames):
 
 def _real_config(path, *, step_times_path=None):
     cfg = {
-        "station_id": "station-1", "camera_id": "cam-0", "takt_s": 30.0, "grace_s": 5.0,
-        "required_slots": list(RAIL), "keepout_zones": [], "liveness_window_s": 2.0,
-        "dark_luma_threshold": 15.0, "dark_window_s": 0.3, "frozen_frames": 10_000,
-        "recover_good_frames": 3, "cycle_interval_s": 0.05, "recover_healthy_verdicts": 2,
-        "fiducial": {"dictionary_id": "DICT_4X4_50", "marker_id": 0,
-                     "expected_center_px": [58, 58], "tolerance_px": 10, "window_s": 10_000.0},
+        "station_id": "station-1",
+        "camera_id": "cam-0",
+        "takt_s": 30.0,
+        "grace_s": 5.0,
+        "required_slots": list(RAIL),
+        "keepout_zones": [],
+        "liveness_window_s": 2.0,
+        "dark_luma_threshold": 15.0,
+        "dark_window_s": 0.3,
+        "frozen_frames": 10_000,
+        "recover_good_frames": 3,
+        "cycle_interval_s": 0.05,
+        "recover_healthy_verdicts": 2,
+        "fiducial": {
+            "dictionary_id": "DICT_4X4_50",
+            "marker_id": 0,
+            "expected_center_px": [58, 58],
+            "tolerance_px": 10,
+            "window_s": 10_000.0,
+        },
         "alarm": {"sinks": ["record"]},
         "watchdog": {"cycle_window_s": 1.0, "alarm_eval_window_s": 1.0, "sinks": ["record"]},
-        "detect": {"persistence_frames": 2, "emit_interval_s": 5.0, "rail_positions": RAIL,
-                   "station_zone": STATION_ZONE, "keepout_rois": {}, "blur_threshold": 100.0,
-                   "darkness_threshold": 40.0, "occlusion_threshold": 0.5},
+        "detect": {
+            "persistence_frames": 2,
+            "emit_interval_s": 5.0,
+            "rail_positions": RAIL,
+            "station_zone": STATION_ZONE,
+            "keepout_rois": {},
+            "blur_threshold": 100.0,
+            "darkness_threshold": 40.0,
+            "occlusion_threshold": 0.5,
+        },
     }
     if step_times_path is not None:
         cfg["detect"]["step_times_path"] = str(step_times_path)
@@ -249,26 +300,43 @@ def _real_config(path, *, step_times_path=None):
 
 
 def _label(path):
-    return {"path": path, "positions": [
-        {"target": "rail_pos_1", "state": "present", "start_frame": 0, "end_frame": 15},
-        {"target": "rail_pos_2", "state": "present", "start_frame": 0, "end_frame": 15},
-    ]}
+    return {
+        "path": path,
+        "positions": [
+            {"target": "rail_pos_1", "state": "present", "start_frame": 0, "end_frame": 15},
+            {"target": "rail_pos_2", "state": "present", "start_frame": 0, "end_frame": 15},
+        ],
+    }
+
+
+def _write_split_manifest(path, dataset, session, split, recorded_on, rel) -> None:
+    """One-session manifest for the split conformance test."""
+    session_entry = {
+        "id": session,
+        "split": split,
+        "recorded_on": recorded_on,
+        "clips": [_label(rel)],
+    }
+    path.write_text(yaml.safe_dump({"dataset": dataset, "sessions": [session_entry]}))
+
+
+def _evaluate_split(split, cfg, manifest, clips, out):
+    """``station-watch evaluate --split ...`` as a subprocess, at test speed."""
+    args = ["--split", split, "--config", str(cfg), "--manifest", str(manifest)]
+    args += ["--clips-dir", str(clips), "--out", str(out), "--force-out", "--speed", "50"]
+    return _run_cli("evaluate", *args)
 
 
 def test_evaluate_split_conformance_end_to_end(tmp_path):
     clips = tmp_path / "clips"
     cal_rel = _render(clips, "cal-sess", "clip", 20)
     cal_manifest = tmp_path / "cal.yaml"
-    cal_manifest.write_text(yaml.safe_dump({"dataset": "cal", "sessions": [
-        {"id": "cal-sess", "split": "calibration", "recorded_on": "2026-09-01",
-         "clips": [_label(cal_rel)]}]}))
+    _write_split_manifest(cal_manifest, "cal", "cal-sess", "calibration", "2026-09-01", cal_rel)
 
     # AC6: a --split calibration run writes split/clip_sha256s/recorded_on everywhere.
     cal_cfg = _real_config(tmp_path / "cal-cfg.yaml")
     cal_out = tmp_path / "cal-out"
-    rc = _run_cli("evaluate", "--split", "calibration", "--config", str(cal_cfg),
-                  "--manifest", str(cal_manifest), "--clips-dir", str(clips),
-                  "--out", str(cal_out), "--force-out", "--speed", "50")
+    rc = _evaluate_split("calibration", cal_cfg, cal_manifest, clips, cal_out)
     assert rc.returncode == 0, rc.stderr
     for name in ("detect.json", "step_times.json"):
         prov = json.loads((cal_out / name).read_text())["provenance"]
@@ -281,13 +349,9 @@ def test_evaluate_split_conformance_end_to_end(tmp_path):
 
     # AC2: a held-out clip byte-identical to a calibration clip exits 5 naming it.
     reuse_manifest = tmp_path / "reuse.yaml"
-    reuse_manifest.write_text(yaml.safe_dump({"dataset": "held", "sessions": [
-        {"id": "reuse-sess", "split": "held_out", "recorded_on": "2026-09-02",
-         "clips": [_label(cal_rel)]}]}))
+    _write_split_manifest(reuse_manifest, "held", "reuse-sess", "held_out", "2026-09-02", cal_rel)
     reuse_out = tmp_path / "reuse-out"
-    reuse = _run_cli("evaluate", "--split", "held_out", "--config", str(held_cfg),
-                     "--manifest", str(reuse_manifest), "--clips-dir", str(clips),
-                     "--out", str(reuse_out), "--force-out", "--speed", "50")
+    reuse = _evaluate_split("held_out", held_cfg, reuse_manifest, clips, reuse_out)
     assert reuse.returncode == EXIT_CALIBRATION_LEAK, reuse.stderr
     assert cal_rel in reuse.stderr
     assert not (reuse_out / "detect.json").exists()
@@ -295,17 +359,11 @@ def test_evaluate_split_conformance_end_to_end(tmp_path):
     # AC5 / AC7: a clean held-out run on fresh clips writes files stamped held_out.
     fresh_rel = _render(clips, "held-sess", "clip", 24)
     fresh_manifest = tmp_path / "fresh.yaml"
-    fresh_manifest.write_text(yaml.safe_dump({"dataset": "held", "sessions": [
-        {"id": "held-sess", "split": "held_out", "recorded_on": "2026-09-05",
-         "clips": [_label(fresh_rel)]}]}))
+    _write_split_manifest(fresh_manifest, "held", "held-sess", "held_out", "2026-09-05", fresh_rel)
     held_out_dir = tmp_path / "held-out"
-    held = _run_cli("evaluate", "--split", "held_out", "--config", str(held_cfg),
-                    "--manifest", str(fresh_manifest), "--clips-dir", str(clips),
-                    "--out", str(held_out_dir), "--force-out", "--speed", "50")
+    held = _evaluate_split("held_out", held_cfg, fresh_manifest, clips, held_out_dir)
     assert held.returncode == 0, held.stderr
     prov = json.loads((held_out_dir / "detect.json").read_text())["provenance"]
     assert prov["split"] == "held_out"
     assert prov["clip_sha256s"] == sorted(prov["clip_sha256s"]) and prov["clip_sha256s"]
-    assert prov["calibration"] == [
-        {"path": str(step_times), "sha256": sha256_file(step_times)}
-    ]
+    assert prov["calibration"] == [{"path": str(step_times), "sha256": sha256_file(step_times)}]

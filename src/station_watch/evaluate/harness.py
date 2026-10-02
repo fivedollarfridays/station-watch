@@ -150,8 +150,20 @@ def _write_outputs(out_dir: Path, *, meta: _Prov, bundle) -> None:
     write_step_times(out_dir / "step_times.json", step_stats(steps), step_prov)
 
 
-def _evaluate(config, scored, out_dir: Path, *, dataset, dataset_kind, manifest_sha,
-              config_sha, speed, backends, split, calibration) -> None:
+def _evaluate(
+    config,
+    scored,
+    out_dir: Path,
+    *,
+    dataset,
+    dataset_kind,
+    manifest_sha,
+    config_sha,
+    speed,
+    backends,
+    split,
+    calibration,
+) -> None:
     with tempfile.TemporaryDirectory() as work:
         bundle = _run_clips(config, scored, Path(work), speed, backends)
     meta = _Prov(
@@ -168,26 +180,24 @@ def _evaluate(config, scored, out_dir: Path, *, dataset, dataset_kind, manifest_
     _write_outputs(out_dir, meta=meta, bundle=bundle)
 
 
+def _load_real(config_path, manifest_path, clips_dir, split):
+    """The manifest, the split's clips, and (held out only) the calibration check."""
+    manifest = load_manifest(manifest_path, clips_dir)
+    calibration = held_out_calibration(config_path, manifest) if split == "held_out" else None
+    return manifest, _scored(manifest, split), calibration
+
+
 def _run_real(config_path, manifest_path, clips_dir, out_dir, speed, split) -> int:
     from station_watch.runner.startup import build_keepout_backend
 
     try:
-        manifest = load_manifest(manifest_path, clips_dir)
+        manifest, scored, calibration = _load_real(config_path, manifest_path, clips_dir, split)
     except NoLabeledSetError as exc:
         print(str(exc))
         return EXIT_NO_LABELED_SET
-    except ManifestError as exc:
+    except CalibrationLeakError as exc:
         print(f"station-watch: {exc}", file=sys.stderr)
-        return EXIT_MISSING_CLIP
-    calibration = None
-    if split == "held_out":
-        try:
-            calibration = held_out_calibration(config_path, manifest)
-        except CalibrationLeakError as exc:
-            print(f"station-watch: {exc}", file=sys.stderr)
-            return EXIT_CALIBRATION_LEAK
-    try:
-        scored = _scored(manifest, split)
+        return EXIT_CALIBRATION_LEAK
     except ManifestError as exc:
         print(f"station-watch: {exc}", file=sys.stderr)
         return EXIT_MISSING_CLIP

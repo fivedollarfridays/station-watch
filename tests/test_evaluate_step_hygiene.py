@@ -184,17 +184,38 @@ def _render_normal(clips_dir: Path) -> tuple[str, Path]:
 
 def _config(path: Path, *, step_times_path=None) -> Path:
     cfg = {
-        "station_id": "station-1", "camera_id": "cam-0", "takt_s": 0.2, "grace_s": 0.1,
-        "required_slots": list(RAIL), "keepout_zones": [], "liveness_window_s": 2.0,
-        "dark_luma_threshold": 15.0, "dark_window_s": 0.3, "frozen_frames": 10_000,
-        "recover_good_frames": 3, "cycle_interval_s": 0.05, "recover_healthy_verdicts": 2,
-        "fiducial": {"dictionary_id": "DICT_4X4_50", "marker_id": 0,
-                     "expected_center_px": [58, 58], "tolerance_px": 10, "window_s": 10_000.0},
+        "station_id": "station-1",
+        "camera_id": "cam-0",
+        "takt_s": 0.2,
+        "grace_s": 0.1,
+        "required_slots": list(RAIL),
+        "keepout_zones": [],
+        "liveness_window_s": 2.0,
+        "dark_luma_threshold": 15.0,
+        "dark_window_s": 0.3,
+        "frozen_frames": 10_000,
+        "recover_good_frames": 3,
+        "cycle_interval_s": 0.05,
+        "recover_healthy_verdicts": 2,
+        "fiducial": {
+            "dictionary_id": "DICT_4X4_50",
+            "marker_id": 0,
+            "expected_center_px": [58, 58],
+            "tolerance_px": 10,
+            "window_s": 10_000.0,
+        },
         "alarm": {"sinks": ["record"]},
         "watchdog": {"cycle_window_s": 1.0, "alarm_eval_window_s": 1.0, "sinks": ["record"]},
-        "detect": {"persistence_frames": 2, "emit_interval_s": 1.0, "rail_positions": RAIL,
-                   "station_zone": {**STATION_ZONE, "track_motion": True}, "keepout_rois": {},
-                   "blur_threshold": 100.0, "darkness_threshold": 40.0, "occlusion_threshold": 0.5},
+        "detect": {
+            "persistence_frames": 2,
+            "emit_interval_s": 1.0,
+            "rail_positions": RAIL,
+            "station_zone": {**STATION_ZONE, "track_motion": True},
+            "keepout_rois": {},
+            "blur_threshold": 100.0,
+            "darkness_threshold": 40.0,
+            "occlusion_threshold": 0.5,
+        },
     }
     if step_times_path is not None:
         cfg["detect"]["step_times_path"] = str(step_times_path)
@@ -210,15 +231,17 @@ def test_step_times_e2e_calibration_then_run_consumes_its_window(tmp_path):
         for t in ("rail_pos_1", "rail_pos_2")
     ]
     manifest = tmp_path / "cal.yaml"
-    manifest.write_text(yaml.safe_dump({"dataset": "cal", "sessions": [
-        {"id": "cal-sess", "split": "calibration", "recorded_on": "2026-09-01",
-         "clips": [{"path": rel, "positions": positions}]}]}))
+    session = {"id": "cal-sess", "split": "calibration", "recorded_on": "2026-09-01"}
+    session["clips"] = [{"path": rel, "positions": positions}]
+    manifest.write_text(yaml.safe_dump({"dataset": "cal", "sessions": [session]}))
 
     eval_cfg = _config(tmp_path / "eval.yaml")
     out = tmp_path / "out"
-    rc = _run_cli("evaluate", "--split", "calibration", "--config", str(eval_cfg),
-                  "--manifest", str(manifest), "--clips-dir", str(clips),
-                  "--out", str(out), "--force-out", "--speed", "50")
+    rc = _run_cli(
+        "evaluate",
+        *("--split", "calibration", "--config", str(eval_cfg), "--manifest", str(manifest)),
+        *("--clips-dir", str(clips), "--out", str(out), "--force-out", "--speed", "50"),
+    )
     assert rc.returncode == 0, rc.stderr
     step_times = out / "step_times.json"
     data = json.loads(step_times.read_text())
@@ -226,9 +249,11 @@ def test_step_times_e2e_calibration_then_run_consumes_its_window(tmp_path):
     p95 = float(data["metrics"]["p95_s"])
 
     run_cfg = _config(tmp_path / "run.yaml", step_times_path=step_times)
-    run = _run_cli("run", "--config", str(run_cfg), "--source", str(clip_path),
-                   "--log", str(tmp_path / "log.db"), "--alarm-record", str(tmp_path / "a.jsonl"),
-                   "--speed", "50", "--max-cycles", "10")
+    run = _run_cli(
+        "run",
+        *("--config", str(run_cfg), "--source", str(clip_path), "--log", str(tmp_path / "log.db")),
+        *("--alarm-record", str(tmp_path / "a.jsonl"), "--speed", "50", "--max-cycles", "10"),
+    )
     assert run.returncode == 0, run.stderr
     assert "measured step times" in run.stdout
     threshold = re.search(r"stall threshold ([\d.]+) s", run.stdout)
