@@ -33,10 +33,17 @@ RUN = "run-score"
 def _healthy_log(path: Path) -> Path:
     with Log(path) as log:
         for seq, offset in enumerate((0.0, 1.0)):
-            log.append(Verdict(
-                station_id="station-1", ts=offset_iso(BASE, offset), state=VerdictState.HEALTHY,
-                faults=(), blind_reasons=(), seq=seq, run_id=RUN,
-            ))
+            log.append(
+                Verdict(
+                    station_id="station-1",
+                    ts=offset_iso(BASE, offset),
+                    state=VerdictState.HEALTHY,
+                    faults=(),
+                    blind_reasons=(),
+                    seq=seq,
+                    run_id=RUN,
+                )
+            )
         log.append(CycleCompleted(ts=offset_iso(BASE, 2.0), cycle=0, stages=(), run_id=RUN))
     return path
 
@@ -55,8 +62,14 @@ def _config(path: Path, max_unknown=0.9) -> Path:
 
 def _flag(flag_id: str, kind: str = "missing_part") -> dict:
     return {
-        "flag_id": flag_id, "kind": kind, "target": "rail_pos_1", "station_id": "station-1",
-        "run_id": RUN, "opened_ts": BASE, "closed_ts": None, "frame_ids": [1],
+        "flag_id": flag_id,
+        "kind": kind,
+        "target": "rail_pos_1",
+        "station_id": "station-1",
+        "run_id": RUN,
+        "opened_ts": BASE,
+        "closed_ts": None,
+        "frame_ids": [1],
     }
 
 
@@ -65,9 +78,7 @@ def _audit_dir(tmp_path, flags, marks=()) -> Path:
     audit.mkdir()
     (audit / "flags.json").write_text(json.dumps(flags) + "\n")
     if marks:
-        (audit / "verdicts.jsonl").write_text(
-            "".join(json.dumps(m) + "\n" for m in marks)
-        )
+        (audit / "verdicts.jsonl").write_text("".join(json.dumps(m) + "\n" for m in marks))
     return audit
 
 
@@ -96,10 +107,27 @@ def test_score_three_reviewed_two_correct_one_incorrect_one_unreviewed(tmp_path)
     log = _healthy_log(tmp_path / "log.db")
 
     result = subprocess.run(
-        [sys.executable, "-m", "station_watch", "audit", "score", "--audit", str(audit),
-         "--config", str(cfg), "--log", str(log), "--dataset-kind", "synthetic",
-         "--out", "measurements/synthetic/score.json"],
-        cwd=tmp_path, capture_output=True, text=True, timeout=90,
+        [
+            sys.executable,
+            "-m",
+            "station_watch",
+            "audit",
+            "score",
+            "--audit",
+            str(audit),
+            "--config",
+            str(cfg),
+            "--log",
+            str(log),
+            "--dataset-kind",
+            "synthetic",
+            "--out",
+            "measurements/synthetic/score.json",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=90,
     )
     assert result.returncode == 0, result.stderr
     payload = json.loads((tmp_path / "measurements/synthetic/score.json").read_text())
@@ -124,9 +152,12 @@ def test_no_marks_writes_no_reviewed_flags_and_no_metrics(tmp_path, monkeypatch)
     monkeypatch.chdir(tmp_path)
     audit = _audit_dir(tmp_path, [_flag(f"{RUN}:missing_part:rail_pos_1:1")])
     rc = score_audit(
-        audit_dir=audit, config_path=_config(tmp_path / "c.yaml"),
-        log_path=_healthy_log(tmp_path / "log.db"), dataset_kind="synthetic",
-        out="measurements/synthetic/score.json", force_out=False,
+        audit_dir=audit,
+        config_path=_config(tmp_path / "c.yaml"),
+        log_path=_healthy_log(tmp_path / "log.db"),
+        dataset_kind="synthetic",
+        out="measurements/synthetic/score.json",
+        force_out=False,
     )
     assert rc == 0
     payload = json.loads((tmp_path / "measurements/synthetic/score.json").read_text())
@@ -140,9 +171,12 @@ def test_qa_failing_session_writes_qa_failed_and_no_metrics(tmp_path, monkeypatc
     fid = f"{RUN}:missing_part:rail_pos_1:1"
     audit = _audit_dir(tmp_path, [_flag(fid)], [_mark(fid, "correct")])
     rc = score_audit(
-        audit_dir=audit, config_path=_config(tmp_path / "c.yaml", max_unknown=0.1),
-        log_path=_empty_log(tmp_path / "log.db"), dataset_kind="synthetic",
-        out="measurements/synthetic/score.json", force_out=False,
+        audit_dir=audit,
+        config_path=_config(tmp_path / "c.yaml", max_unknown=0.1),
+        log_path=_empty_log(tmp_path / "log.db"),
+        dataset_kind="synthetic",
+        out="measurements/synthetic/score.json",
+        force_out=False,
     )
     assert rc == 0
     payload = json.loads((tmp_path / "measurements/synthetic/score.json").read_text())
@@ -160,9 +194,12 @@ def test_synthetic_out_outside_tree_refused_and_writes_nothing(tmp_path, monkeyp
     monkeypatch.chdir(tmp_path)
     audit = _audit_dir(tmp_path, [_flag(f"{RUN}:missing_part:rail_pos_1:1")])
     rc = score_audit(
-        audit_dir=audit, config_path=_config(tmp_path / "c.yaml"),
-        log_path=_healthy_log(tmp_path / "log.db"), dataset_kind="synthetic",
-        out="measurements/v1/score.json", force_out=False,  # v1 is for real, not synthetic
+        audit_dir=audit,
+        config_path=_config(tmp_path / "c.yaml"),
+        log_path=_healthy_log(tmp_path / "log.db"),
+        dataset_kind="synthetic",
+        out="measurements/v1/score.json",
+        force_out=False,  # v1 is for real, not synthetic
     )
     assert rc == 2
     assert "synthetic" in capsys.readouterr().err
@@ -174,9 +211,12 @@ def test_real_out_outside_tree_refused(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     audit = _audit_dir(tmp_path, [_flag(f"{RUN}:missing_part:rail_pos_1:1")])
     rc = score_audit(
-        audit_dir=audit, config_path=_config(tmp_path / "c.yaml"),
-        log_path=_healthy_log(tmp_path / "log.db"), dataset_kind="real",
-        out="measurements/synthetic/score.json", force_out=False,
+        audit_dir=audit,
+        config_path=_config(tmp_path / "c.yaml"),
+        log_path=_healthy_log(tmp_path / "log.db"),
+        dataset_kind="real",
+        out="measurements/synthetic/score.json",
+        force_out=False,
     )
     assert rc == 2
     assert "real" in capsys.readouterr().err
@@ -189,9 +229,12 @@ def test_force_out_writes_outside_with_a_warning(tmp_path, monkeypatch, capsys):
     fid = f"{RUN}:missing_part:rail_pos_1:1"
     audit = _audit_dir(tmp_path, [_flag(fid)], [_mark(fid, "correct")])
     rc = score_audit(
-        audit_dir=audit, config_path=_config(tmp_path / "c.yaml"),
-        log_path=_healthy_log(tmp_path / "log.db"), dataset_kind="synthetic",
-        out="outside/score.json", force_out=True,
+        audit_dir=audit,
+        config_path=_config(tmp_path / "c.yaml"),
+        log_path=_healthy_log(tmp_path / "log.db"),
+        dataset_kind="synthetic",
+        out="outside/score.json",
+        force_out=True,
     )
     assert rc == 0
     assert "WARNING" in capsys.readouterr().err
@@ -210,8 +253,12 @@ def test_log_bytes_unchanged_and_manifest_sha_is_verdicts_plus_flags(tmp_path, m
     before = hashlib.sha256(log.read_bytes()).hexdigest()
 
     score_audit(
-        audit_dir=audit, config_path=_config(tmp_path / "c.yaml"), log_path=log,
-        dataset_kind="synthetic", out="measurements/synthetic/score.json", force_out=False,
+        audit_dir=audit,
+        config_path=_config(tmp_path / "c.yaml"),
+        log_path=log,
+        dataset_kind="synthetic",
+        out="measurements/synthetic/score.json",
+        force_out=False,
     )
     assert hashlib.sha256(log.read_bytes()).hexdigest() == before
 

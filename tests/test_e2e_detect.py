@@ -398,14 +398,23 @@ def test_missing_torque_stripe_faults_once_and_recovers_when_restored(tmp_path):
     config = _write_config(
         tmp_path / "station.yaml",
         required_slots=["rail_pos_1.torque_stripe"],
-        detect={"rail_positions": RAIL, "slot_details": {"rail_pos_1": {"torque_stripe": STRIPE_REGION}}},
+        detect={
+            "rail_positions": RAIL,
+            "slot_details": {"rail_pos_1": {"torque_stripe": STRIPE_REGION}},
+        },
     )
     missing = [
-        {"positions": {"rail_pos_1": "present", "rail_pos_2": "present"}, "details": {"rail_pos_1": {"torque_stripe": "absent"}}}
+        {
+            "positions": {"rail_pos_1": "present", "rail_pos_2": "present"},
+            "details": {"rail_pos_1": {"torque_stripe": "absent"}},
+        }
         for _ in range(30)
     ]
     restored = [
-        {"positions": {"rail_pos_1": "present", "rail_pos_2": "present"}, "details": {"rail_pos_1": {"torque_stripe": "present"}}}
+        {
+            "positions": {"rail_pos_1": "present", "rail_pos_2": "present"},
+            "details": {"rail_pos_1": {"torque_stripe": "present"}},
+        }
         for _ in range(30)
     ]
     clip = _clip(tmp_path, "stripe", missing + restored, fps=20.0)

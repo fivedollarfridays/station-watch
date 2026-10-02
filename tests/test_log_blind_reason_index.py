@@ -93,7 +93,9 @@ def test_the_writer_creates_the_blind_reason_index(tmp_path):
         pass
     conn = sqlite3.connect(str(path))
     try:
-        names = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")}
+        names = {
+            row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
+        }
     finally:
         conn.close()
     assert "records_blind_reason" in names

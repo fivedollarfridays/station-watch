@@ -78,8 +78,9 @@ def test_xss_hostile_values_are_escaped_with_no_script_or_handlers():
 
 
 def test_a_cited_frame_with_no_evidence_shows_the_reason_and_no_image():
-    cell = FrameCell(frame_id=7, capture_ts=None, jpeg=None, overlay_available=False,
-                     missing_reason="pruned")
+    cell = FrameCell(
+        frame_id=7, capture_ts=None, jpeg=None, overlay_available=False, missing_reason="pruned"
+    )
     sheet = render_sheet("audit", [(_flag(frames=[cell]), [cell])])
     assert "no evidence: pruned" in sheet
     parsed = _parse(sheet)
@@ -88,8 +89,13 @@ def test_a_cited_frame_with_no_evidence_shows_the_reason_and_no_image():
 
 def test_a_frame_without_a_marker_says_overlay_unavailable_but_still_shows_the_image():
     jpeg = b"\xff\xd8\xff\xe0not-really-jpeg"
-    cell = FrameCell(frame_id=3, capture_ts="2026-10-01T00:00:01.000000+00:00", jpeg=jpeg,
-                     overlay_available=False, missing_reason=None)
+    cell = FrameCell(
+        frame_id=3,
+        capture_ts="2026-10-01T00:00:01.000000+00:00",
+        jpeg=jpeg,
+        overlay_available=False,
+        missing_reason=None,
+    )
     sheet = render_sheet("audit", [(_flag(frames=[cell]), [cell])])
     assert "overlay unavailable: fiducial not found" in sheet
     parsed = _parse(sheet)

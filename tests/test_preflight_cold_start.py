@@ -50,11 +50,23 @@ def _cold_start(
 ) -> subprocess.CompletedProcess:
     return subprocess.run(
         [
-            *_entry_point(), "preflight", "--cold-start", "--config", str(config),
-            "--source", str(clip), "--log", str(log), "--dataset-kind", "synthetic",
+            *_entry_point(),
+            "preflight",
+            "--cold-start",
+            "--config",
+            str(config),
+            "--source",
+            str(clip),
+            "--log",
+            str(log),
+            "--dataset-kind",
+            "synthetic",
             *extra,
         ],
-        cwd=tmp_path, capture_output=True, text=True, timeout=180,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=180,
     )
 
 
@@ -73,7 +85,13 @@ def test_cold_start_on_a_healthy_clip_writes_increasing_timings(tmp_path):
 def test_cold_start_on_a_clip_that_never_turns_healthy_writes_no_metrics(tmp_path):
     clip = write_synth_clip(tmp_path / "clip", frames=40, fps=10.0, hide_marker_from=0)
     result = _cold_start(
-        tmp_path, clip, tmp_path / "station.db", "--out", OUT_REL, "--timeout-s", "30",
+        tmp_path,
+        clip,
+        tmp_path / "station.db",
+        "--out",
+        OUT_REL,
+        "--timeout-s",
+        "30",
         config=_never_healthy_config(tmp_path),
     )
     assert result.returncode == 1, result.stdout + result.stderr
@@ -103,9 +121,21 @@ def test_rows_from_an_earlier_run_in_the_same_log_do_not_count(tmp_path):
     log = tmp_path / "station.db"
     healthy = write_synth_clip(tmp_path / "healthy", frames=30, fps=10.0)
     subprocess.run(
-        [*_entry_point(), "run", "--config", str(CONFIG), "--source", str(healthy),
-         "--log", str(log)],
-        cwd=tmp_path, capture_output=True, text=True, timeout=120, check=True,
+        [
+            *_entry_point(),
+            "run",
+            "--config",
+            str(CONFIG),
+            "--source",
+            str(healthy),
+            "--log",
+            str(log),
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=True,
     )
     with sqlite3.connect(log) as conn:
         healthy_rows = conn.execute(
@@ -114,7 +144,13 @@ def test_rows_from_an_earlier_run_in_the_same_log_do_not_count(tmp_path):
     assert healthy_rows > 0  # the earlier run did leave healthy verdicts behind
     blind = write_synth_clip(tmp_path / "blind", frames=30, fps=10.0, hide_marker_from=0)
     result = _cold_start(
-        tmp_path, blind, log, "--out", OUT_REL, "--timeout-s", "30",
+        tmp_path,
+        blind,
+        log,
+        "--out",
+        OUT_REL,
+        "--timeout-s",
+        "30",
         config=_never_healthy_config(tmp_path),
     )
     assert result.returncode == 1, result.stdout + result.stderr

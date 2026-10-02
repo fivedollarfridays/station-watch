@@ -34,9 +34,7 @@ def add_parser(sub) -> None:
     # --out/--dataset-kind/--source/duration describe a soak the supervisor drives; the
     # hidden --child entry below runs the runner child alone and needs none of them, so
     # requiredness is enforced in `handle` per mode rather than by argparse.
-    soak.add_argument(
-        "--out", help="measurement file to write (table written beside it)"
-    )
+    soak.add_argument("--out", help="measurement file to write (table written beside it)")
     soak.add_argument(
         "--dataset-kind",
         choices=["real", "synthetic"],

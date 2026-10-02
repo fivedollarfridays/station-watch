@@ -85,9 +85,21 @@ def test_read_all_is_empty_before_any_mark(tmp_path):
 # --------------------------------------------------------------------------- #
 def _mark_cli(audit, flag_id, verdict, *extra):
     return subprocess.run(
-        [sys.executable, "-m", "station_watch", "audit", "mark", "--audit", str(audit),
-         flag_id, verdict, *extra],
-        capture_output=True, text=True, timeout=60,
+        [
+            sys.executable,
+            "-m",
+            "station_watch",
+            "audit",
+            "mark",
+            "--audit",
+            str(audit),
+            flag_id,
+            verdict,
+            *extra,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
 
 

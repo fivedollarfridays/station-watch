@@ -154,9 +154,12 @@ def test_a_log_without_the_blind_reason_index_renders_the_same_view(tmp_path, ca
     try:
         conn.execute("DROP INDEX IF EXISTS records_blind_reason")
         conn.commit()
-        assert conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='index' AND name='records_blind_reason'"
-        ).fetchone() is None
+        assert (
+            conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='index' AND name='records_blind_reason'"
+            ).fetchone()
+            is None
+        )
     finally:
         conn.close()
 

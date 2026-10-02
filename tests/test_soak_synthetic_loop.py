@@ -43,8 +43,16 @@ def test_synthetic_loop_with_dataset_real_is_refused_naming_the_rule(capsys):
 
 def test_source_and_synthetic_loop_together_is_refused(capsys):
     args = _parse(
-        [*_LOOP, "--synthetic-loop", "--source", "clip.mp4",
-         "--dataset-kind", "synthetic", "--minutes", "0.1"]
+        [
+            *_LOOP,
+            "--synthetic-loop",
+            "--source",
+            "clip.mp4",
+            "--dataset-kind",
+            "synthetic",
+            "--minutes",
+            "0.1",
+        ]
     )
     code = commandline.handle(args)
     assert code != 0
@@ -79,9 +87,7 @@ def test_synthetic_loop_runner_argv_targets_the_soak_child(monkeypatch):
         captured["argv"] = runner_argv
         return 0
 
-    monkeypatch.setattr(
-        "station_watch.soak.supervisor.run_soak", fake_run_soak, raising=True
-    )
+    monkeypatch.setattr("station_watch.soak.supervisor.run_soak", fake_run_soak, raising=True)
     args = _parse([*_LOOP, "--synthetic-loop", "--dataset-kind", "synthetic", "--minutes", "0.1"])
     assert commandline.handle(args) == 0
     argv = captured["argv"]
@@ -132,11 +138,28 @@ def test_e2e_synthetic_loop_starts_three_children_samples_stops_and_passes(tmp_p
 
     result = subprocess.run(
         [
-            *_entry_point(), "soak", "--config", str(cfg), "--log", str(tmp_path / "soak.db"),
-            "--out", out_rel, "--dataset-kind", "synthetic", "--synthetic-loop",
-            "--minutes", "0.5", "--sample-s", "3", "--board-port", str(port),
+            *_entry_point(),
+            "soak",
+            "--config",
+            str(cfg),
+            "--log",
+            str(tmp_path / "soak.db"),
+            "--out",
+            out_rel,
+            "--dataset-kind",
+            "synthetic",
+            "--synthetic-loop",
+            "--minutes",
+            "0.5",
+            "--sample-s",
+            "3",
+            "--board-port",
+            str(port),
         ],
-        cwd=tmp_path, capture_output=True, text=True, timeout=180,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=180,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 

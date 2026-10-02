@@ -22,8 +22,14 @@ from station_watch.evaluate import commandline, harness
 
 def _args(**over):
     base = dict(
-        config="cfg.yaml", manifest="m.yaml", clips_dir="clips", out=None,
-        synthetic=False, speed=None, split="calibration", force_out=False,
+        config="cfg.yaml",
+        manifest="m.yaml",
+        clips_dir="clips",
+        out=None,
+        synthetic=False,
+        speed=None,
+        split="calibration",
+        force_out=False,
     )
     base.update(over)
     return SimpleNamespace(**base)
@@ -34,8 +40,16 @@ def captured(monkeypatch):
     """Stub ``run_evaluation``; return a dict that records the out_dir it was given."""
     seen: dict = {}
 
-    def fake(*, config_path, manifest_path, out_dir, synthetic, clips_dir, speed=None,
-             split="calibration"):
+    def fake(
+        *,
+        config_path,
+        manifest_path,
+        out_dir,
+        synthetic,
+        clips_dir,
+        speed=None,
+        split="calibration",
+    ):
         seen["out_dir"] = out_dir
         seen["synthetic"] = synthetic
         return 0

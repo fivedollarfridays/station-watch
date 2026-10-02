@@ -69,7 +69,7 @@ def render_sheet(title: str, flags: list[tuple[AuditFlag, list[FrameCell]]]) -> 
     else:
         body = f'<p class="meta">{esc(_NO_FLAGS)}</p>'
     return (
-        "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
+        '<!DOCTYPE html>\n<html lang="en">\n<head>\n'
         '<meta charset="utf-8">\n'
         f'<meta http-equiv="Content-Security-Policy" content="{_CSP}">\n'
         f"<title>{esc(title)}</title>\n"

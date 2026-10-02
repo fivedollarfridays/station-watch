@@ -58,7 +58,10 @@ def _poly(frame):
 
 
 def _present_spec(seed):
-    return {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "present"}}}
+    return {
+        "positions": {"rail_pos_1": "present"},
+        "details": {"rail_pos_1": {"torque_stripe": "present"}},
+    }
 
 
 # --- AC1: present reads present, absent reads absent, across noise seeds ---------
@@ -72,13 +75,19 @@ def test_present_reads_present_and_absent_reads_absent_across_seeds(tmp_path):
     for seed in range(5):
         present = _frame(
             tmp_path,
-            {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "present"}}},
+            {
+                "positions": {"rail_pos_1": "present"},
+                "details": {"rail_pos_1": {"torque_stripe": "present"}},
+            },
             tag=f"p{seed}",
             seed=seed,
         )
         absent = _frame(
             tmp_path,
-            {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "absent"}}},
+            {
+                "positions": {"rail_pos_1": "present"},
+                "details": {"rail_pos_1": {"torque_stripe": "absent"}},
+            },
             tag=f"a{seed}",
             seed=seed,
         )
@@ -96,7 +105,10 @@ def test_stripe_outside_configured_hue_range_reads_absent(tmp_path):
     # fills it and the stripe reads absent (its hue is outside the configured range).
     present = _frame(
         tmp_path,
-        {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "present"}}},
+        {
+            "positions": {"rail_pos_1": "present"},
+            "details": {"rail_pos_1": {"torque_stripe": "present"}},
+        },
     )
     detect = {**DETECT, "details": {"torque_stripe": {"min_fill": 0.15, "hue_range": [170, 179]}}}
     r = read_detail(present, _poly(present), "torque_stripe", detect)
@@ -247,7 +259,10 @@ def _for(observations, target):
 
 def test_present_component_with_stripe_reads_part_present(tmp_path):
     script = [
-        {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "present"}}}
+        {
+            "positions": {"rail_pos_1": "present"},
+            "details": {"rail_pos_1": {"torque_stripe": "present"}},
+        }
         for _ in range(5)
     ]
     obs = _drive(tmp_path, script, ["rail_pos_1", "rail_pos_1.torque_stripe"])
@@ -259,7 +274,10 @@ def test_present_component_with_stripe_reads_part_present(tmp_path):
 
 def test_present_component_without_stripe_reads_part_absent(tmp_path):
     script = [
-        {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "absent"}}}
+        {
+            "positions": {"rail_pos_1": "present"},
+            "details": {"rail_pos_1": {"torque_stripe": "absent"}},
+        }
         for _ in range(5)
     ]
     obs = _drive(tmp_path, script, ["rail_pos_1", "rail_pos_1.torque_stripe"])

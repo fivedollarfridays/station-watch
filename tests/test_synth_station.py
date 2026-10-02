@@ -119,20 +119,33 @@ def test_a_frame_without_details_is_byte_identical_to_an_all_absent_detail_frame
     # same pixels for the same seed -- the detail machinery adds nothing when nothing
     # is present, so every existing (detail-free) clip renders exactly as before.
     base = {"positions": {"rail_pos_1": "present"}}
-    absent = {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "absent"}}}
-    present = {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "present"}}}
+    absent = {
+        "positions": {"rail_pos_1": "present"},
+        "details": {"rail_pos_1": {"torque_stripe": "absent"}},
+    }
+    present = {
+        "positions": {"rail_pos_1": "present"},
+        "details": {"rail_pos_1": {"torque_stripe": "present"}},
+    }
 
     p_base, _ = write_synth_station_clip(tmp_path / "base", [base], seed=3)
     p_absent, _ = write_synth_station_clip(tmp_path / "absent", [absent], seed=3)
     p_present, _ = write_synth_station_clip(tmp_path / "present", [present], seed=3)
 
-    assert np.array_equal(_first_frame(p_base), _first_frame(p_absent)), "absent detail draws nothing"
-    assert not np.array_equal(_first_frame(p_base), _first_frame(p_present)), "a stripe changes pixels"
+    assert np.array_equal(_first_frame(p_base), _first_frame(p_absent)), (
+        "absent detail draws nothing"
+    )
+    assert not np.array_equal(_first_frame(p_base), _first_frame(p_present)), (
+        "a stripe changes pixels"
+    )
 
 
 def test_ground_truth_carries_the_drawn_details(tmp_path):
     script = [
-        {"positions": {"rail_pos_1": "present"}, "details": {"rail_pos_1": {"torque_stripe": "present"}}},
+        {
+            "positions": {"rail_pos_1": "present"},
+            "details": {"rail_pos_1": {"torque_stripe": "present"}},
+        },
         {"positions": {"rail_pos_1": "present"}},
     ]
     _path, truth = write_synth_station_clip(tmp_path / "d", script)

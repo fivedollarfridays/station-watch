@@ -50,8 +50,16 @@ class ColdStart:
 def run_command(config: str, source: str, log: str) -> list[str]:
     """The child: the real ``run`` subcommand, through the package entry point."""
     return [
-        sys.executable, "-m", "station_watch", "run",
-        "--config", config, "--source", source, "--log", log,
+        sys.executable,
+        "-m",
+        "station_watch",
+        "run",
+        "--config",
+        config,
+        "--source",
+        source,
+        "--log",
+        log,
     ]
 
 

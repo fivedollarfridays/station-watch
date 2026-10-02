@@ -138,7 +138,9 @@ def _contained_clip_path(rel: str, clips_dir: Path, session: str) -> Path:
 SPLITS = ("calibration", "held_out")
 
 
-def _clip_label(session: str, entry: dict, clips_dir: Path, *, split: str, recorded_on) -> ClipLabel:
+def _clip_label(
+    session: str, entry: dict, clips_dir: Path, *, split: str, recorded_on
+) -> ClipLabel:
     rel = entry["path"]
     clip_path = _contained_clip_path(rel, clips_dir, session)
     if not clip_path.exists():

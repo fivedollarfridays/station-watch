@@ -62,7 +62,9 @@ def _unchanged(current: dict | None, verdict: str, note: str, reviewer: str) -> 
     )
 
 
-def append_mark(audit_dir, flag_id: str, verdict: str, note: str, reviewer: str, *, ts: str) -> bool:
+def append_mark(
+    audit_dir, flag_id: str, verdict: str, note: str, reviewer: str, *, ts: str
+) -> bool:
     """Append one verdict line for ``flag_id`` unless it equals the effective one.
 
     Returns ``True`` if a line was appended, ``False`` if the mark was already the

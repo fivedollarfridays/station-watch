@@ -155,7 +155,9 @@ def test_process_with_given_corners_does_not_search_again(tmp_path, monkeypatch)
 
     config = _config()
     frame = _one_synth_frame(tmp_path, {"positions": {"rail_pos_1": "present"}})
-    corners = find_marker_corners(frame, config.fiducial["dictionary_id"], config.fiducial["marker_id"])
+    corners = find_marker_corners(
+        frame, config.fiducial["dictionary_id"], config.fiducial["marker_id"]
+    )
     assert corners is not None
 
     detector = Detector(config, run_id="r")

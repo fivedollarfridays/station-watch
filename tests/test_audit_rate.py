@@ -50,24 +50,44 @@ def _log(path: Path, verdicts, end_offset) -> Path:
     """A Log of the given ``(offset_s, state)`` verdicts, closed by a cycle at ``end``."""
     with Log(path) as log:
         for seq, (offset, state) in enumerate(verdicts):
-            log.append(Verdict(
-                station_id="station-1", ts=offset_iso(BASE, offset), state=state,
-                faults=(), blind_reasons=(), seq=seq, run_id=RUN,
-            ))
+            log.append(
+                Verdict(
+                    station_id="station-1",
+                    ts=offset_iso(BASE, offset),
+                    state=state,
+                    faults=(),
+                    blind_reasons=(),
+                    seq=seq,
+                    run_id=RUN,
+                )
+            )
         log.append(CycleCompleted(ts=offset_iso(BASE, end_offset), cycle=0, stages=(), run_id=RUN))
     return path
 
 
 def _two_observable_hours(path: Path) -> Path:
     """Three HEALTHY verdicts an hour apart: a 2-observable-hour session."""
-    return _log(path, [(0.0, VerdictState.HEALTHY), (HOUR, VerdictState.HEALTHY),
-                        (2 * HOUR, VerdictState.HEALTHY)], end_offset=2 * HOUR)
+    return _log(
+        path,
+        [
+            (0.0, VerdictState.HEALTHY),
+            (HOUR, VerdictState.HEALTHY),
+            (2 * HOUR, VerdictState.HEALTHY),
+        ],
+        end_offset=2 * HOUR,
+    )
 
 
 def _flag(flag_id: str, kind: str = "missing_part", target: str = "rail_pos_1") -> dict:
     return {
-        "flag_id": flag_id, "kind": kind, "target": target, "station_id": "station-1",
-        "run_id": RUN, "opened_ts": BASE, "closed_ts": None, "frame_ids": [1],
+        "flag_id": flag_id,
+        "kind": kind,
+        "target": target,
+        "station_id": "station-1",
+        "run_id": RUN,
+        "opened_ts": BASE,
+        "closed_ts": None,
+        "frame_ids": [1],
     }
 
 
@@ -114,10 +134,29 @@ def test_rate_proving_two_hours_four_flags(tmp_path):
     log = _two_observable_hours(tmp_path / "log.db")
 
     result = subprocess.run(
-        [sys.executable, "-m", "station_watch", "audit", "rate", "--audit", str(audit),
-         "--config", str(cfg), "--log", str(log), "--dataset-kind", "synthetic",
-         "--out", "measurements/synthetic/rate.json", "--min-hours", "1.0"],
-        cwd=tmp_path, capture_output=True, text=True, timeout=90,
+        [
+            sys.executable,
+            "-m",
+            "station_watch",
+            "audit",
+            "rate",
+            "--audit",
+            str(audit),
+            "--config",
+            str(cfg),
+            "--log",
+            str(log),
+            "--dataset-kind",
+            "synthetic",
+            "--out",
+            "measurements/synthetic/rate.json",
+            "--min-hours",
+            "1.0",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=90,
     )
     assert result.returncode == 0, result.stderr
     payload = json.loads((tmp_path / "measurements/synthetic/rate.json").read_text())
@@ -145,14 +184,25 @@ def test_blind_time_does_not_inflate_observed_hours(tmp_path, monkeypatch):
     audit = _audit_dir(tmp_path, flags, marks)
     cfg = _config(tmp_path / "c.yaml")
     # Same 2 observable hours, then an extra UNOBSERVABLE hour before the final cycle.
-    log = _log(tmp_path / "log.db", [
-        (0.0, VerdictState.HEALTHY), (HOUR, VerdictState.HEALTHY),
-        (2 * HOUR, VerdictState.HEALTHY), (2 * HOUR, VerdictState.UNOBSERVABLE),
-    ], end_offset=3 * HOUR)
+    log = _log(
+        tmp_path / "log.db",
+        [
+            (0.0, VerdictState.HEALTHY),
+            (HOUR, VerdictState.HEALTHY),
+            (2 * HOUR, VerdictState.HEALTHY),
+            (2 * HOUR, VerdictState.UNOBSERVABLE),
+        ],
+        end_offset=3 * HOUR,
+    )
 
     rc = rate_audit(
-        audit_dir=audit, config_path=cfg, log_path=log, dataset_kind="synthetic",
-        out="measurements/synthetic/rate.json", min_hours=1.0, force_out=False,
+        audit_dir=audit,
+        config_path=cfg,
+        log_path=log,
+        dataset_kind="synthetic",
+        out="measurements/synthetic/rate.json",
+        min_hours=1.0,
+        force_out=False,
     )
     assert rc == 0
     metrics = json.loads((tmp_path / "measurements/synthetic/rate.json").read_text())["metrics"]
@@ -173,8 +223,13 @@ def test_insufficient_duration_names_both_numbers_and_no_metrics(tmp_path, monke
     log = _two_observable_hours(tmp_path / "log.db")  # 2.0 observed hours
 
     rc = rate_audit(
-        audit_dir=audit, config_path=cfg, log_path=log, dataset_kind="synthetic",
-        out="measurements/synthetic/rate.json", min_hours=5.0, force_out=False,
+        audit_dir=audit,
+        config_path=cfg,
+        log_path=log,
+        dataset_kind="synthetic",
+        out="measurements/synthetic/rate.json",
+        min_hours=5.0,
+        force_out=False,
     )
     assert rc == 0
     payload = json.loads((tmp_path / "measurements/synthetic/rate.json").read_text())
@@ -190,13 +245,23 @@ def test_qa_failing_session_writes_qa_failed_and_no_metrics(tmp_path, monkeypatc
     audit = _audit_dir(tmp_path, flags, marks)
     # A long gap (> cycle_window_s) makes the session almost entirely unobservable.
     cfg = _config(tmp_path / "c.yaml", max_unknown=0.1, cycle_window_s=1.0)
-    log = _log(tmp_path / "log.db", [
-        (0.0, VerdictState.HEALTHY), (2 * HOUR, VerdictState.HEALTHY),
-    ], end_offset=2 * HOUR)
+    log = _log(
+        tmp_path / "log.db",
+        [
+            (0.0, VerdictState.HEALTHY),
+            (2 * HOUR, VerdictState.HEALTHY),
+        ],
+        end_offset=2 * HOUR,
+    )
 
     rc = rate_audit(
-        audit_dir=audit, config_path=cfg, log_path=log, dataset_kind="synthetic",
-        out="measurements/synthetic/rate.json", min_hours=0.0, force_out=False,
+        audit_dir=audit,
+        config_path=cfg,
+        log_path=log,
+        dataset_kind="synthetic",
+        out="measurements/synthetic/rate.json",
+        min_hours=0.0,
+        force_out=False,
     )
     assert rc == 0
     payload = json.loads((tmp_path / "measurements/synthetic/rate.json").read_text())
@@ -217,8 +282,13 @@ def test_blind_episodes_only_in_their_own_block(tmp_path, monkeypatch):
     log = _two_observable_hours(tmp_path / "log.db")
 
     rc = rate_audit(
-        audit_dir=audit, config_path=cfg, log_path=log, dataset_kind="synthetic",
-        out="measurements/synthetic/rate.json", min_hours=1.0, force_out=False,
+        audit_dir=audit,
+        config_path=cfg,
+        log_path=log,
+        dataset_kind="synthetic",
+        out="measurements/synthetic/rate.json",
+        min_hours=1.0,
+        force_out=False,
     )
     assert rc == 0
     metrics = json.loads((tmp_path / "measurements/synthetic/rate.json").read_text())["metrics"]
@@ -239,9 +309,13 @@ def test_out_outside_tree_refused_and_writes_nothing(tmp_path, monkeypatch, caps
     monkeypatch.chdir(tmp_path)
     audit = _audit_dir(tmp_path, [_flag(f"{RUN}:missing_part:rail_pos_1:1")])
     rc = rate_audit(
-        audit_dir=audit, config_path=_config(tmp_path / "c.yaml"),
-        log_path=_two_observable_hours(tmp_path / "log.db"), dataset_kind="synthetic",
-        out="measurements/v1/rate.json", min_hours=1.0, force_out=False,
+        audit_dir=audit,
+        config_path=_config(tmp_path / "c.yaml"),
+        log_path=_two_observable_hours(tmp_path / "log.db"),
+        dataset_kind="synthetic",
+        out="measurements/v1/rate.json",
+        min_hours=1.0,
+        force_out=False,
     )
     assert rc == 2
     assert "synthetic" in capsys.readouterr().err

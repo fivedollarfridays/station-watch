@@ -144,9 +144,7 @@ def test_a_writer_that_always_raises_counts_and_reports_once(tmp_path, capsys):
         raise RuntimeError("disk full")
 
     reports = []
-    store = EvidenceStore(
-        tmp_path / "evidence", RUN, encode=boom, report=reports.append
-    )
+    store = EvidenceStore(tmp_path / "evidence", RUN, encode=boom, report=reports.append)
     for fid in range(4):
         frame = _frame(fid)
         store.note_frame(frame, fid, "t", compute_fingerprint(frame), None, had_observation=True)

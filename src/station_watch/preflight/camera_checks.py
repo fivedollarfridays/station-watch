@@ -134,9 +134,7 @@ def _sample_marker_centers(source, window_s: float, dictionary_id: str, marker_i
 def _max_drift(centers: list) -> float:
     """The largest distance any sampled center sits from the first one, in pixels."""
     first = centers[0]
-    return max(
-        ((c[0] - first[0]) ** 2 + (c[1] - first[1]) ** 2) ** 0.5 for c in centers
-    )
+    return max(((c[0] - first[0]) ** 2 + (c[1] - first[1]) ** 2) ** 0.5 for c in centers)
 
 
 def _measure_drift(ctx: PreflightContext) -> tuple[float | None, float, str]:
@@ -148,18 +146,28 @@ def _measure_drift(ctx: PreflightContext) -> tuple[float | None, float, str]:
         ctx.frame_source, ctx.drift_s, fid["dictionary_id"], int(fid["marker_id"])
     )
     if len(centers) < 2:
-        return None, limit, (
-            f"only {len(centers)} frame(s) with the marker in {ctx.drift_s}s; "
-            "cannot measure drift"
+        return (
+            None,
+            limit,
+            (
+                f"only {len(centers)} frame(s) with the marker in {ctx.drift_s}s; "
+                "cannot measure drift"
+            ),
         )
     drift = _max_drift(centers)
     if drift > limit:
-        return drift, limit, (
-            f"fiducial center drifted {drift:.1f}px over {ctx.drift_s}s "
-            f"(limit {limit:.1f}px = half tolerance {tolerance}px)"
+        return (
+            drift,
+            limit,
+            (
+                f"fiducial center drifted {drift:.1f}px over {ctx.drift_s}s "
+                f"(limit {limit:.1f}px = half tolerance {tolerance}px)"
+            ),
         )
-    return drift, limit, (
-        f"fiducial center steady within {drift:.1f}px over {ctx.drift_s}s (limit {limit:.1f}px)"
+    return (
+        drift,
+        limit,
+        (f"fiducial center steady within {drift:.1f}px over {ctx.drift_s}s (limit {limit:.1f}px)"),
     )
 
 

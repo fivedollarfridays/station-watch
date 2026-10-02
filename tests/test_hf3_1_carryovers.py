@@ -181,11 +181,22 @@ def test_measure_startup_error_exits_clean(tmp_path):
     missing = tmp_path / "nope.yaml"
     result = subprocess.run(
         [
-            sys.executable, "-m", "station_watch", "measure", "occlusion",
-            "--clips", str(manifest), "--clips-dir", str(clips_dir),
-            "--config", str(missing), "--out", str(tmp_path / "out.json"),
+            sys.executable,
+            "-m",
+            "station_watch",
+            "measure",
+            "occlusion",
+            "--clips",
+            str(manifest),
+            "--clips-dir",
+            str(clips_dir),
+            "--config",
+            str(missing),
+            "--out",
+            str(tmp_path / "out.json"),
         ],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     _assert_clean_cli_error(result, needle="nope.yaml")
 
@@ -216,11 +227,23 @@ def test_measure_no_fps_clip_exits_clean(tmp_path):
 def test_drill_reproduce_command_roundtrips_through_shlex():
     from station_watch.drill.commandline import _command
 
-    argv = ["--config", "a b/c.yaml", "--log", "l$x.db", "--out", "o u t.json",
-            "--schedule", "sch ed.yaml"]
+    argv = [
+        "--config",
+        "a b/c.yaml",
+        "--log",
+        "l$x.db",
+        "--out",
+        "o u t.json",
+        "--schedule",
+        "sch ed.yaml",
+    ]
     args = Namespace(
-        config="a b/c.yaml", log="l$x.db", out="o u t.json",
-        live=False, schedule="sch ed.yaml", source=None,
+        config="a b/c.yaml",
+        log="l$x.db",
+        out="o u t.json",
+        live=False,
+        schedule="sch ed.yaml",
+        source=None,
     )
     assert shlex.split(_command(args)) == ["station-watch", "drill", *argv]
 
@@ -230,7 +253,11 @@ def test_measure_reproduce_command_roundtrips_through_shlex():
 
     args = Namespace(name="occlusion", synthetic=False, clips="c l$i/p.yaml")
     assert shlex.split(_command(args)) == [
-        "station-watch", "measure", "occlusion", "--clips", "c l$i/p.yaml"
+        "station-watch",
+        "measure",
+        "occlusion",
+        "--clips",
+        "c l$i/p.yaml",
     ]
 
 
@@ -259,7 +286,9 @@ def test_real_evaluate_builds_one_backend_per_clip(tmp_path, monkeypatch):
         )
         clips.append({"path": str(Path(path).relative_to(clips_dir))})
     manifest = tmp_path / "m.yaml"
-    manifest.write_text(yaml.safe_dump({"dataset": "d", "sessions": [{"id": "s1", "clips": clips}]}))
+    manifest.write_text(
+        yaml.safe_dump({"dataset": "d", "sessions": [{"id": "s1", "clips": clips}]})
+    )
     config = tmp_path / "config.yaml"
     config.write_text(yaml.safe_dump(_config_dict()))
 

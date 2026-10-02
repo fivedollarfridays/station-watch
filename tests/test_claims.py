@@ -191,9 +191,7 @@ def _is_real_calibration(path: Path) -> bool:
 def held_out_committed(root: Path) -> bool:
     """True once any committed measurement file is a real held-out measurement."""
     measurements = root / "measurements"
-    return measurements.is_dir() and any(
-        _is_real_held_out(p) for p in measurements.rglob("*.json")
-    )
+    return measurements.is_dir() and any(_is_real_held_out(p) for p in measurements.rglob("*.json"))
 
 
 def held_out_claim_errors(root: Path, text: str) -> list[str]:
@@ -250,42 +248,75 @@ def _write_meas(root: Path, rel: str, *, dataset_kind: str, split: str, metrics:
 
 
 def test_held_out_rule_is_dormant_until_a_held_out_file_exists(tmp_path):
-    _write_meas(tmp_path, "measurements/v1/detect.json", dataset_kind="real",
-                split="calibration", metrics={"missing_part": {"precision": 1.0}})
-    readme = (f"{SECTION_HEADING}\n\n<!-- claim: measurements/v1/detect.json"
-              "#metrics.missing_part.precision round=2 -->1.00\n")
+    _write_meas(
+        tmp_path,
+        "measurements/v1/detect.json",
+        dataset_kind="real",
+        split="calibration",
+        metrics={"missing_part": {"precision": 1.0}},
+    )
+    readme = (
+        f"{SECTION_HEADING}\n\n<!-- claim: measurements/v1/detect.json"
+        "#metrics.missing_part.precision round=2 -->1.00\n"
+    )
     assert not held_out_committed(tmp_path)
     assert held_out_claim_errors(tmp_path, readme) == []
 
 
 def test_a_calibration_claim_fails_naming_it_once_a_held_out_file_exists(tmp_path):
-    _write_meas(tmp_path, "measurements/v1/detect.json", dataset_kind="real",
-                split="calibration", metrics={"missing_part": {"precision": 1.0}})
-    _write_meas(tmp_path, "measurements/v2/detect.json", dataset_kind="real",
-                split="held_out", metrics={"missing_part": {"precision": 0.9}})
-    readme = (f"{SECTION_HEADING}\n\nHeld-out numbers now.\n\n"
-              "<!-- claim: measurements/v1/detect.json"
-              "#metrics.missing_part.precision round=2 -->1.00\n")
+    _write_meas(
+        tmp_path,
+        "measurements/v1/detect.json",
+        dataset_kind="real",
+        split="calibration",
+        metrics={"missing_part": {"precision": 1.0}},
+    )
+    _write_meas(
+        tmp_path,
+        "measurements/v2/detect.json",
+        dataset_kind="real",
+        split="held_out",
+        metrics={"missing_part": {"precision": 0.9}},
+    )
+    readme = (
+        f"{SECTION_HEADING}\n\nHeld-out numbers now.\n\n"
+        "<!-- claim: measurements/v1/detect.json"
+        "#metrics.missing_part.precision round=2 -->1.00\n"
+    )
     errors = held_out_claim_errors(tmp_path, readme)
-    assert any(
-        "measurements/v1/detect.json#metrics.missing_part.precision" in e for e in errors
-    ), errors
+    assert any("measurements/v1/detect.json#metrics.missing_part.precision" in e for e in errors), (
+        errors
+    )
 
 
 def test_citing_the_held_out_file_passes(tmp_path):
-    _write_meas(tmp_path, "measurements/v2/detect.json", dataset_kind="real",
-                split="held_out", metrics={"missing_part": {"precision": 0.9}})
-    readme = (f"{SECTION_HEADING}\n\nHeld-out numbers now.\n\n"
-              "<!-- claim: measurements/v2/detect.json"
-              "#metrics.missing_part.precision round=2 -->0.90\n")
+    _write_meas(
+        tmp_path,
+        "measurements/v2/detect.json",
+        dataset_kind="real",
+        split="held_out",
+        metrics={"missing_part": {"precision": 0.9}},
+    )
+    readme = (
+        f"{SECTION_HEADING}\n\nHeld-out numbers now.\n\n"
+        "<!-- claim: measurements/v2/detect.json"
+        "#metrics.missing_part.precision round=2 -->0.90\n"
+    )
     assert held_out_claim_errors(tmp_path, readme) == []
 
 
 def test_section_without_held_out_words_fails_when_a_held_out_file_is_committed(tmp_path):
-    _write_meas(tmp_path, "measurements/v2/detect.json", dataset_kind="real",
-                split="held_out", metrics={"missing_part": {"precision": 0.9}})
-    readme = (f"{SECTION_HEADING}\n\n<!-- claim: measurements/v2/detect.json"
-              "#metrics.missing_part.precision round=2 -->0.90\n")
+    _write_meas(
+        tmp_path,
+        "measurements/v2/detect.json",
+        dataset_kind="real",
+        split="held_out",
+        metrics={"missing_part": {"precision": 0.9}},
+    )
+    readme = (
+        f"{SECTION_HEADING}\n\n<!-- claim: measurements/v2/detect.json"
+        "#metrics.missing_part.precision round=2 -->0.90\n"
+    )
     errors = held_out_claim_errors(tmp_path, readme)
     assert any("held-out" in e for e in errors), errors
 

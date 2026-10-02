@@ -96,18 +96,36 @@ def test_e2e_clean_clip_passes_and_exits_zero(tmp_path):
     clip = write_synth_clip(tmp_path / "clip", frames=30)
     result = subprocess.run(
         [
-            *_entry_point(), "preflight", "--config", str(cfg),
-            "--source", str(clip), "--log", str(tmp_path / "station.db"),
+            *_entry_point(),
+            "preflight",
+            "--config",
+            str(cfg),
+            "--source",
+            str(clip),
+            "--log",
+            str(tmp_path / "station.db"),
         ],
-        cwd=tmp_path, capture_output=True, text=True, timeout=120,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     lines = result.stdout.strip().splitlines()
     # One aligned line per check, in order, then the verdict.
     assert [line.split()[0] for line in lines[:-1]] == EXPECTED_CHECKS
     assert lines[-1] == "PREFLIGHT PASS"
-    for name in ("config", "camera", "frames_live", "fiducial", "camera_stability",
-                 "log_writable", "disk_space", "clock", "alarm_sinks"):
+    for name in (
+        "config",
+        "camera",
+        "frames_live",
+        "fiducial",
+        "camera_stability",
+        "log_writable",
+        "disk_space",
+        "clock",
+        "alarm_sinks",
+    ):
         assert f"{name} " in result.stdout
         line = next(line for line in lines if line.startswith(name))
         assert "PASS" in line, line
@@ -123,10 +141,19 @@ def test_hidden_marker_fails_fiducial_and_exits_one(tmp_path):
     clip = write_synth_clip(tmp_path / "clip", frames=30, hide_marker_from=0)
     result = subprocess.run(
         [
-            *_entry_point(), "preflight", "--config", str(cfg),
-            "--source", str(clip), "--log", str(tmp_path / "station.db"),
+            *_entry_point(),
+            "preflight",
+            "--config",
+            str(cfg),
+            "--source",
+            str(clip),
+            "--log",
+            str(tmp_path / "station.db"),
         ],
-        cwd=tmp_path, capture_output=True, text=True, timeout=120,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
     assert result.returncode == 1, result.stdout
     fiducial = next(line for line in result.stdout.splitlines() if line.startswith("fiducial"))
@@ -193,9 +220,7 @@ def test_a_raising_check_is_a_fail_not_a_crash(tmp_path):
         raise RuntimeError("kaboom")
 
     cfg = _config(tmp_path)
-    results = run_preflight(
-        str(cfg), "0", str(tmp_path / "station.db"), checks={"boom": boom}
-    )
+    results = run_preflight(str(cfg), "0", str(tmp_path / "station.db"), checks={"boom": boom})
     assert results[0].status == FAIL
     assert "kaboom" in results[0].detail
 
@@ -210,9 +235,7 @@ def test_a_slow_check_times_out_as_fail(tmp_path, monkeypatch):
         return CheckResult("slow", PASS, "never")
 
     cfg = _config(tmp_path)
-    results = run_preflight(
-        str(cfg), "0", str(tmp_path / "station.db"), checks={"slow": slow}
-    )
+    results = run_preflight(str(cfg), "0", str(tmp_path / "station.db"), checks={"slow": slow})
     assert results[0].status == FAIL
     assert "timed out" in results[0].detail
 
@@ -228,13 +251,12 @@ def test_board_check_answers_a_real_board_subprocess(tmp_path):
     port = _free_port()
     board = subprocess.Popen(
         [*_entry_point(), "board", "--config", str(cfg), "--log", str(log), "--port", str(port)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     try:
         _wait_for_port(port)
-        results = _by_name(
-            run_preflight(str(cfg), "0", str(log), board_port=port)
-        )
+        results = _by_name(run_preflight(str(cfg), "0", str(log), board_port=port))
         assert results["board"].status == PASS, results["board"].detail
     finally:
         board.terminate()
@@ -272,8 +294,7 @@ def test_json_output_matches_text_results(tmp_path):
     text = render_text(results)
     for check in payload["checks"]:
         assert any(
-            line.startswith(check["name"]) and check["status"] in line
-            for line in text.splitlines()
+            line.startswith(check["name"]) and check["status"] in line for line in text.splitlines()
         )
 
 
@@ -287,8 +308,13 @@ def test_preflight_leaves_the_log_bytes_unchanged(tmp_path):
     with Log(log) as handle:
         handle.append(
             Verdict(
-                station_id=HEALTH_CONFIG["station_id"], ts=offset_iso(PAST, 0),
-                state=VerdictState.HEALTHY, faults=(), blind_reasons=(), seq=0, run_id=run_id,
+                station_id=HEALTH_CONFIG["station_id"],
+                ts=offset_iso(PAST, 0),
+                state=VerdictState.HEALTHY,
+                faults=(),
+                blind_reasons=(),
+                seq=0,
+                run_id=run_id,
             )
         )
         handle.append(CycleCompleted(ts=offset_iso(PAST, 1), cycle=0, stages=(), run_id=run_id))
@@ -311,8 +337,13 @@ def test_clock_fails_when_wall_clock_predates_newest_log_row(tmp_path):
     with Log(log) as handle:
         handle.append(
             Verdict(
-                station_id=HEALTH_CONFIG["station_id"], ts=future,
-                state=VerdictState.HEALTHY, faults=(), blind_reasons=(), seq=0, run_id="run-f",
+                station_id=HEALTH_CONFIG["station_id"],
+                ts=future,
+                state=VerdictState.HEALTHY,
+                faults=(),
+                blind_reasons=(),
+                seq=0,
+                run_id="run-f",
             )
         )
     results = _by_name(run_preflight(str(cfg), str(clip), str(log)))

@@ -102,7 +102,11 @@ class ReviewHandler(BaseHTTPRequestHandler):
             self._json(400, {"ok": False, "error": f"verdict must be one of {VALID_VERDICTS}"})
             return
         appended = append_mark(
-            self.server.audit_dir, flag_id, verdict, note, self.server.reviewer,
+            self.server.audit_dir,
+            flag_id,
+            verdict,
+            note,
+            self.server.reviewer,
             ts=self.server.clock(),
         )
         self._json(200, {"ok": True, "flag_id": flag_id, "appended": appended})

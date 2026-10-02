@@ -27,8 +27,14 @@ TS = "2026-10-01T00:00:00.000000+00:00"
 
 def _flag(flag_id=FID, kind="missing_part", target="rail_pos_1") -> dict:
     return {
-        "flag_id": flag_id, "kind": kind, "target": target, "station_id": "station-1",
-        "run_id": RUN, "opened_ts": TS, "closed_ts": None, "frame_ids": [1, 2],
+        "flag_id": flag_id,
+        "kind": kind,
+        "target": target,
+        "station_id": "station-1",
+        "run_id": RUN,
+        "opened_ts": TS,
+        "closed_ts": None,
+        "frame_ids": [1, 2],
     }
 
 
@@ -48,8 +54,13 @@ class _Served:
     def __init__(self, audit, token="tok-fixed-value", reviewer="alice"):
         flags = json.loads((audit / "flags.json").read_text())
         self.server = make_review_server(
-            audit, flags, [f["flag_id"] for f in flags], reviewer,
-            port=0, token=token, clock=lambda: TS,
+            audit,
+            flags,
+            [f["flag_id"] for f in flags],
+            reviewer,
+            port=0,
+            token=token,
+            clock=lambda: TS,
         )
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
 
@@ -63,8 +74,18 @@ class _Served:
         self.thread.join(timeout=5)
 
 
-def _request(port, *, method="GET", path="/", host=None, origin=None, cookie=None,
-             token=None, content_type=None, body=None):
+def _request(
+    port,
+    *,
+    method="GET",
+    path="/",
+    host=None,
+    origin=None,
+    cookie=None,
+    token=None,
+    content_type=None,
+    body=None,
+):
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
     try:
         conn.putrequest(method, path, skip_host=True)
@@ -136,7 +157,7 @@ class _Page(HTMLParser):
         self._in_script = False
 
     def handle_starttag(self, tag, attrs):
-        for name, value in attrs:
+        for name, _value in attrs:
             if name.lower().startswith("on"):
                 self.on_attrs.append((tag, name))
         if tag == "script":
@@ -150,8 +171,16 @@ def test_xss_hostile_flag_and_note_are_escaped_with_one_nonced_script(tmp_path):
     flag = _flag(flag_id=f"{RUN}:blind:{hostile}:1", kind=f"unobservable:{hostile}", target=hostile)
     audit = _audit_dir(tmp_path, [flag])
     (audit / "verdicts.jsonl").write_text(
-        json.dumps({"flag_id": flag["flag_id"], "verdict": "incorrect", "note": note,
-                    "reviewer": "alice", "ts": TS}) + "\n"
+        json.dumps(
+            {
+                "flag_id": flag["flag_id"],
+                "verdict": "incorrect",
+                "note": note,
+                "reviewer": "alice",
+                "ts": TS,
+            }
+        )
+        + "\n"
     )
     with _Served(audit, token="tok-xss-secret") as port:
         status, headers, raw = _request(port, path="/")
@@ -187,11 +216,11 @@ def test_every_html_response_carries_nosniff_and_no_store(tmp_path):
 def test_unknown_flag_and_invalid_verdict_get_400_and_append_nothing(tmp_path):
     audit = _audit_dir(tmp_path)
     with _Served(audit, token="tok") as port:
-        unknown = _post(port, token="tok",
-                        body=json.dumps({"flag_id": "nope", "verdict": "correct"}))
+        unknown = _post(
+            port, token="tok", body=json.dumps({"flag_id": "nope", "verdict": "correct"})
+        )
         assert unknown[0] == 400
-        bad = _post(port, token="tok",
-                    body=json.dumps({"flag_id": FID, "verdict": "maybe"}))
+        bad = _post(port, token="tok", body=json.dumps({"flag_id": FID, "verdict": "maybe"}))
         assert bad[0] == 400
         not_json = _post(port, token="tok", body="not json at all")
         assert not_json[0] == 400
@@ -201,14 +230,19 @@ def test_unknown_flag_and_invalid_verdict_get_400_and_append_nothing(tmp_path):
 def test_re_marking_over_http_changes_the_effective_verdict_and_appends_one_line(tmp_path):
     audit = _audit_dir(tmp_path)
     with _Served(audit, token="tok") as port:
-        first = _post(port, token="tok",
-                      body=json.dumps({"flag_id": FID, "verdict": "correct", "note": ""}))
+        first = _post(
+            port, token="tok", body=json.dumps({"flag_id": FID, "verdict": "correct", "note": ""})
+        )
         assert first[0] == 200 and json.loads(first[2])["appended"] is True
-        same = _post(port, token="tok",
-                     body=json.dumps({"flag_id": FID, "verdict": "correct", "note": ""}))
+        same = _post(
+            port, token="tok", body=json.dumps({"flag_id": FID, "verdict": "correct", "note": ""})
+        )
         assert same[0] == 200 and json.loads(same[2])["appended"] is False
-        changed = _post(port, token="tok",
-                        body=json.dumps({"flag_id": FID, "verdict": "incorrect", "note": "x"}))
+        changed = _post(
+            port,
+            token="tok",
+            body=json.dumps({"flag_id": FID, "verdict": "incorrect", "note": "x"}),
+        )
         assert changed[0] == 200 and json.loads(changed[2])["appended"] is True
     lines = [json.loads(ln) for ln in _lines(audit)]
     assert len(lines) == 2
@@ -237,9 +271,22 @@ def test_server_binds_only_to_loopback(tmp_path):
 # --------------------------------------------------------------------------- #
 def _start_subprocess_server(audit):
     proc = subprocess.Popen(
-        [sys.executable, "-m", "station_watch", "audit", "review", "--audit", str(audit),
-         "--port", "0", "--reviewer", "carol"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        [
+            sys.executable,
+            "-m",
+            "station_watch",
+            "audit",
+            "review",
+            "--audit",
+            str(audit),
+            "--port",
+            "0",
+            "--reviewer",
+            "carol",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
     serving = proc.stdout.readline()
     port = int(re.search(r"http://127\.0\.0\.1:(\d+)/", serving).group(1))
@@ -248,8 +295,9 @@ def _start_subprocess_server(audit):
 
 
 def test_proving_subprocess_accepts_token_by_cookie_and_header_refuses_otherwise(tmp_path):
-    audit = _audit_dir(tmp_path, [_flag(), _flag(flag_id=f"{RUN}:missing_part:rail_pos_2:2",
-                                                 target="rail_pos_2")])
+    audit = _audit_dir(
+        tmp_path, [_flag(), _flag(flag_id=f"{RUN}:missing_part:rail_pos_2:2", target="rail_pos_2")]
+    )
     fid2 = f"{RUN}:missing_part:rail_pos_2:2"
     proc, port, token = _start_subprocess_server(audit)
     try:
@@ -258,11 +306,13 @@ def test_proving_subprocess_accepts_token_by_cookie_and_header_refuses_otherwise
         assert token not in body.decode()
         cookie = headers["Set-Cookie"].split(";", 1)[0]  # audit_token=<token>
 
-        by_cookie = _post(port, cookie=cookie,
-                          body=json.dumps({"flag_id": FID, "verdict": "correct"}))
+        by_cookie = _post(
+            port, cookie=cookie, body=json.dumps({"flag_id": FID, "verdict": "correct"})
+        )
         assert by_cookie[0] == 200, by_cookie
-        by_header = _post(port, token=token,
-                          body=json.dumps({"flag_id": fid2, "verdict": "incorrect"}))
+        by_header = _post(
+            port, token=token, body=json.dumps({"flag_id": fid2, "verdict": "incorrect"})
+        )
         assert by_header[0] == 200, by_header
         assert len(_lines(audit)) == 2
         marks = [json.loads(ln) for ln in _lines(audit)]

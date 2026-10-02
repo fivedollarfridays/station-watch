@@ -103,14 +103,31 @@ def test_run_then_audit_build_flags_a_missing_part_and_a_dark_blind(tmp_path):
     out = tmp_path / "audit"
 
     run = _run_cli(
-        "run", "--config", str(cfg), "--source", str(clip), "--log", str(logdb),
-        "--alarm-record", str(tmp_path / "alarm.jsonl"), "--evidence-dir", str(evidence),
+        "run",
+        "--config",
+        str(cfg),
+        "--source",
+        str(clip),
+        "--log",
+        str(logdb),
+        "--alarm-record",
+        str(tmp_path / "alarm.jsonl"),
+        "--evidence-dir",
+        str(evidence),
     )
     assert run.returncode == 0, run.stderr
 
     build = _run_cli(
-        "audit", "build", "--config", str(cfg), "--log", str(logdb),
-        "--evidence-dir", str(evidence), "--out", str(out),
+        "audit",
+        "build",
+        "--config",
+        str(cfg),
+        "--log",
+        str(logdb),
+        "--evidence-dir",
+        str(evidence),
+        "--out",
+        str(out),
     )
     assert build.returncode == 0, build.stderr
 

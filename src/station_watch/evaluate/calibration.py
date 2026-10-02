@@ -74,7 +74,9 @@ def _load_calibration_file(path: str) -> _CalibrationFile:
     )
 
 
-def _calibration_dates(cal_files: list[_CalibrationFile], manifest: Manifest) -> dict[str, list[str]]:
+def _calibration_dates(
+    cal_files: list[_CalibrationFile], manifest: Manifest
+) -> dict[str, list[str]]:
     """Date -> the calibration session ids recorded on it, over every source."""
     dates: dict[str, list[str]] = defaultdict(list)
     for cal in cal_files:

@@ -112,9 +112,7 @@ def render_json(results: list[CheckResult]) -> str:
     """The same results as JSON: a ``checks`` list and the overall ``ok`` boolean."""
     return json.dumps(
         {
-            "checks": [
-                {"name": r.name, "status": r.status, "detail": r.detail} for r in results
-            ],
+            "checks": [{"name": r.name, "status": r.status, "detail": r.detail} for r in results],
             "ok": preflight_ok(results),
         }
     )

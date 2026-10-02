@@ -56,9 +56,7 @@ _NO_FLAGS = "no flags in this session"
 def _radio(flag_id: str, value: str, current: str | None) -> str:
     checked = " checked" if current == value else ""
     name = f"v-{esc(flag_id)}"
-    return (
-        f'<label><input type="radio" name="{name}" value="{value}"{checked}> {value}</label>'
-    )
+    return f'<label><input type="radio" name="{name}" value="{value}"{checked}> {value}</label>'
 
 
 def _control(flag_id: str, verdict: dict | None) -> str:
@@ -87,9 +85,14 @@ def _section(flag: dict, verdict: dict | None) -> str:
     )
     frames = ", ".join(str(fid) for fid in audit_flag.frame_ids) or "none"
     cited = f'<div class="meta">cited frames {esc(frames)}</div>'
-    return "<section>\n" + flag_body(audit_flag, []) + "\n" + cited + _control(
-        flag["flag_id"], verdict
-    ) + "\n</section>"
+    return (
+        "<section>\n"
+        + flag_body(audit_flag, [])
+        + "\n"
+        + cited
+        + _control(flag["flag_id"], verdict)
+        + "\n</section>"
+    )
 
 
 def render_review_sheet(title: str, flags: list[dict], verdicts: dict, nonce: str) -> str:

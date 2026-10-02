@@ -88,9 +88,7 @@ class _FakeCamera:
     def __init__(self, width, height, fps, frame_ok):
         self.resolution = (width, height)
         self.fps = fps
-        self._frame = (
-            np.zeros((height, width, 3), np.uint8) if frame_ok else None
-        )
+        self._frame = np.zeros((height, width, 3), np.uint8) if frame_ok else None
 
     def read(self):
         return self._frame
@@ -146,9 +144,7 @@ def test_camera_stability_warns_for_a_gimbal():
 def test_camera_stability_warns_when_the_marker_drifts(tmp_path):
     # tolerance_px is 10 -> half is 5px; an 8px shift mid-clip is a drift WARN.
     cfg = _config(tmp_path)
-    clip = write_synth_clip(
-        tmp_path / "clip", frames=30, marker_move_from=10, marker_move_px=8
-    )
+    clip = write_synth_clip(tmp_path / "clip", frames=30, marker_move_from=10, marker_move_px=8)
     results = _by_name(run_preflight(str(cfg), str(clip), str(tmp_path / "station.db")))
     stability = results["camera_stability"]
     assert stability.status == WARN
@@ -215,11 +211,7 @@ def test_pocket3_device_steps_are_marked_unverified():
         (i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")),
         len(lines),
     )
-    steps = [
-        ln
-        for ln in lines[start + 1 : end]
-        if re.match(r"\s*(\d+\.|-)\s", ln)
-    ]
+    steps = [ln for ln in lines[start + 1 : end] if re.match(r"\s*(\d+\.|-)\s", ln)]
     assert steps, "the Pocket 3 section should list device steps"
     for step in steps:
         assert "unverified" in step.lower(), step

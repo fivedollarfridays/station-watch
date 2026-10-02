@@ -90,9 +90,7 @@ def test_frame_source_error_names_the_device_index(monkeypatch):
         raise AssertionError("an absent index must raise CaptureError")
 
 
-def test_run_source_7_with_fake_capture_exits_nonzero_naming_index_7(
-    tmp_path, monkeypatch, capsys
-):
+def test_run_source_7_with_fake_capture_exits_nonzero_naming_index_7(tmp_path, monkeypatch, capsys):
     _fake_opencv(monkeypatch, {0: (640, 480, 30.0)})
     cfg = _config(tmp_path)
     code = cli.main(

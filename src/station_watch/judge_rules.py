@@ -80,9 +80,7 @@ def missing_part_faults(by_target, required_slots) -> list[Fault]:
         if newest is not None and newest.kind == ObservationKind.PART_ABSENT:
             faults.append(Fault(FaultKind.MISSING_PART, slot, (newest.frame_id,)))
     faulted = {f.target for f in faults}
-    return [
-        f for f in faults if "." not in f.target or f.target.split(".", 1)[0] not in faulted
-    ]
+    return [f for f in faults if "." not in f.target or f.target.split(".", 1)[0] not in faulted]
 
 
 def keepout_faults(by_target, keepout_zones) -> list[Fault]:

@@ -120,9 +120,7 @@ def _check_rss(samples, thresholds, metrics, failures) -> None:
         growth = _rss_growth(samples, name)
         metrics[f"rss_growth_mb_per_h.{name}"] = growth
         if growth > limit:
-            failures.append(
-                f"RSS growth for {name} {growth:.1f} MB/h exceeds max {limit:.1f} MB/h"
-            )
+            failures.append(f"RSS growth for {name} {growth:.1f} MB/h exceeds max {limit:.1f} MB/h")
 
 
 def _check_log(samples, thresholds, metrics, failures) -> None:

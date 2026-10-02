@@ -193,9 +193,7 @@ def rate_audit(*, audit_dir, config_path, log_path, dataset_kind, out, min_hours
     observed_hours = qa.observable_s / 3600.0
     session_hours = qa.session_s / 3600.0
     provenance = _provenance(audit_dir, log_path, config_path, dataset_kind, flags)
-    _write(
-        resolved_out, provenance, flags, verdicts, qa, observed_hours, session_hours, min_hours
-    )
+    _write(resolved_out, provenance, flags, verdicts, qa, observed_hours, session_hours, min_hours)
     print(f"station-watch audit rate: wrote {resolved_out}")
     return 0
 

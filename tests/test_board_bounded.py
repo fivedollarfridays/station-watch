@@ -147,8 +147,7 @@ def test_every_render_query_uses_the_index_without_a_temp_sort(tmp_path, monkeyp
             params = (None,) * sql.count("?")
             plan = " | ".join(row[3] for row in conn.execute(f"EXPLAIN QUERY PLAN {sql}", params))
             assert (
-                "USING INDEX records_kind_ts" in plan
-                or "USING INDEX records_blind_reason" in plan
+                "USING INDEX records_kind_ts" in plan or "USING INDEX records_blind_reason" in plan
             ), f"{sql}: {plan}"
             assert "TEMP B-TREE" not in plan, f"{sql}: {plan}"
             assert "LIMIT" in sql.upper(), f"unbounded render query: {sql}"

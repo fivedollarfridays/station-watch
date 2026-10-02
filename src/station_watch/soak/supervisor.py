@@ -66,8 +66,14 @@ def _child_specs(args, runner_argv: list[str]) -> dict:
         "run": runner_argv,
         "watchdog": [*_EXE, "watchdog", "--config", args.config, "--log", args.log],
         "board": [
-            *_EXE, "board", "--config", args.config, "--log", args.log,
-            "--port", str(args.board_port),
+            *_EXE,
+            "board",
+            "--config",
+            args.config,
+            "--log",
+            args.log,
+            "--port",
+            str(args.board_port),
         ],
     }
 
@@ -117,9 +123,7 @@ def _run_loop(children, *, duration_s, sample_s, log_path, board_port):
             return samples, failure
         if elapsed >= next_sample:
             samples.append(
-                take_sample(
-                    elapsed_s=elapsed, pids=pids, log_path=log_path, board_port=board_port
-                )
+                take_sample(elapsed_s=elapsed, pids=pids, log_path=log_path, board_port=board_port)
             )
             next_sample += sample_s
         if elapsed >= duration_s:
