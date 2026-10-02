@@ -25,10 +25,12 @@ from station_watch.runner.startup import StartupError, build_context
 from station_watch.synth.source import SyntheticSource
 
 # Frames per second the looping source paces to: brisk enough that a frame always
-# lands inside a realistic liveness window, modest enough not to burn the box for
-# hours. Pacing is wall-clock (unlike the drill's frame clock) -- a soak measures
-# real elapsed hours, so its time must be the real clock.
-CHILD_FPS = 10.0
+# lands inside a realistic liveness window, light enough that an hours-long soak
+# does not drown the box (and the Log and the Judge's per-run observation history,
+# which both grow with frame volume, stay modest). Pacing is wall-clock (unlike the
+# drill's frame clock) -- a soak measures real elapsed hours, so its time must be
+# the real clock.
+CHILD_FPS = 1.0
 
 _PRESENT = {"rail_pos_1": "present", "rail_pos_2": "present"}
 # Normal work: both parts present throughout, with a short motion burst every few

@@ -1,0 +1,31 @@
+{
+  "metrics": {
+    "board_render_failures": 0,
+    "board_render_p95_s": 0.02577391598606482,
+    "duration_s": 600.0,
+    "failures": [],
+    "false_flags": 0,
+    "log_growth_mb_per_h": 16.2928970109487,
+    "max_verdict_gap_s": 20.140699166979175,
+    "post_warmup_samples": 26,
+    "qa_observable_s": 597.04900598526,
+    "qa_status": "pass",
+    "qa_unobservable_fraction": 0.001676333636445136,
+    "rss_growth_mb_per_h.board": 6.714945953235008,
+    "rss_growth_mb_per_h.run": 44.283752979302584,
+    "rss_growth_mb_per_h.watchdog": 1.265420638702636,
+    "status": "pass",
+    "verdicts_per_minute": 59.40769046418924
+  },
+  "provenance": {
+    "clips": 0,
+    "config_sha256": "de6ff611e008b1d8e0e57c8c2ae0f1f0faed9c578d04d7ef49ea4cabdf91ede8",
+    "dataset": "station-1",
+    "dataset_kind": "synthetic",
+    "date_utc": "2026-10-02",
+    "detector": "station_watch.detect:real-pipeline:v1",
+    "git_commit": "397dede548b5d679a33a3997e49993c0f273c3ea",
+    "manifest_sha256": "none",
+    "sessions": []
+  }
+}

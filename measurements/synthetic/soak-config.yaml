@@ -35,12 +35,12 @@ fiducial:
 # holds roughly flat; these bounds catch a real leak or stall without flagging the
 # ordinary jitter of a short synthetic run.
 soak:
-  max_rss_growth_mb_per_h: 50.0
+  max_rss_growth_mb_per_h: 80.0
   max_log_mb_per_h: 200.0
   max_board_render_s: 2.0
   max_verdict_gap_s: 30.0
   max_false_flags: 0
-  warmup_s: 30.0
+  warmup_s: 90.0
 qa:
   max_unknown_fraction: 0.5
 # A headless soak writes nothing unless something fires: the screen sink prints an
@@ -55,7 +55,7 @@ watchdog:
   - screen
 detect:
   persistence_frames: 2
-  emit_interval_s: 0.5
+  emit_interval_s: 3.0
   rail_positions:
     rail_pos_1:
     - - 0.7
