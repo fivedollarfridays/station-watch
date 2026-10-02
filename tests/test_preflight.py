@@ -44,6 +44,7 @@ EXPECTED_CHECKS = [
     "camera",
     "frames_live",
     "fiducial",
+    "camera_stability",
     "model_weights",
     "log_writable",
     "disk_space",
@@ -105,8 +106,8 @@ def test_e2e_clean_clip_passes_and_exits_zero(tmp_path):
     # One aligned line per check, in order, then the verdict.
     assert [line.split()[0] for line in lines[:-1]] == EXPECTED_CHECKS
     assert lines[-1] == "PREFLIGHT PASS"
-    for name in ("config", "camera", "frames_live", "fiducial", "log_writable",
-                 "disk_space", "clock", "alarm_sinks"):
+    for name in ("config", "camera", "frames_live", "fiducial", "camera_stability",
+                 "log_writable", "disk_space", "clock", "alarm_sinks"):
         assert f"{name} " in result.stdout
         line = next(line for line in lines if line.startswith(name))
         assert "PASS" in line, line

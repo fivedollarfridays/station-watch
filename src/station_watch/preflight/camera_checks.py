@@ -16,11 +16,15 @@ import time
 from station_watch.capture.metrics import fingerprint, noise_score
 from station_watch.detect.geometry import find_marker_corners, marker_center
 from station_watch.preflight.context import PreflightContext
-from station_watch.preflight.result import FAIL, PASS, CheckResult
+from station_watch.preflight.result import FAIL, PASS, WARN, CheckResult
 from station_watch.runner.startup import StartupError, open_source
 
 # "Several" live frames: enough to tell a noisy live sensor from a frozen one.
 _LIVE_FRAME_TARGET = 3
+
+# A gimbal is never a hard fail (the station can run), but it is always a WARN: a
+# gimbal drifts and raises view_shifted, so it must be locked before going live.
+_GIMBAL_WARNING = "a gimbal can drift and raise view_shifted; lock it before going live"
 
 
 def check_camera(ctx: PreflightContext) -> CheckResult:
@@ -106,4 +110,66 @@ def check_fiducial(ctx: PreflightContext) -> CheckResult:
     )
 
 
-__all__ = ["check_camera", "check_frames_live", "check_fiducial"]
+def _sample_marker_centers(source, window_s: float, dictionary_id: str, marker_id: int) -> list:
+    """Marker centers read off ``source`` within ``window_s`` wall-clock seconds.
+
+    A file source exhausts (EOS) long before the window on a fast disk; a live
+    camera samples for the full window. Frames with no marker are skipped rather
+    than aborting -- a brief miss is not a drift reading.
+    """
+    centers: list = []
+    deadline = time.monotonic() + window_s
+    while time.monotonic() < deadline:
+        frame = source.read()
+        if frame is None:
+            break
+        center = marker_center(find_marker_corners(frame, dictionary_id, marker_id))
+        if center is not None:
+            centers.append(center)
+    return centers
+
+
+def _max_drift(centers: list) -> float:
+    """The largest distance any sampled center sits from the first one, in pixels."""
+    first = centers[0]
+    return max(
+        ((c[0] - first[0]) ** 2 + (c[1] - first[1]) ** 2) ** 0.5 for c in centers
+    )
+
+
+def check_camera_stability(ctx: PreflightContext) -> CheckResult:
+    """A gimbal always WARNs; otherwise the fiducial center must not drift past half tolerance."""
+    gimbal = bool((ctx.raw_config or {}).get("camera", {}).get("gimbal", False))
+    if gimbal:
+        return CheckResult("camera_stability", WARN, _GIMBAL_WARNING)
+    if ctx.station_config is None:
+        return CheckResult("camera_stability", FAIL, "config did not load")
+    if ctx.camera_error is not None:
+        return CheckResult("camera_stability", FAIL, f"camera did not open: {ctx.camera_error}")
+    fid = ctx.station_config.fiducial
+    dictionary_id, marker_id = fid["dictionary_id"], int(fid["marker_id"])
+    tolerance = float(fid["tolerance_px"])
+    limit = tolerance / 2.0
+    centers = _sample_marker_centers(ctx.frame_source, ctx.drift_s, dictionary_id, marker_id)
+    if len(centers) < 2:
+        return CheckResult(
+            "camera_stability",
+            WARN,
+            f"only {len(centers)} frame(s) with the marker in {ctx.drift_s}s; cannot measure drift",
+        )
+    drift = _max_drift(centers)
+    if drift > limit:
+        return CheckResult(
+            "camera_stability",
+            WARN,
+            f"fiducial center drifted {drift:.1f}px over {ctx.drift_s}s "
+            f"(limit {limit:.1f}px = half tolerance {tolerance}px)",
+        )
+    return CheckResult(
+        "camera_stability",
+        PASS,
+        f"fiducial center steady within {drift:.1f}px over {ctx.drift_s}s (limit {limit:.1f}px)",
+    )
+
+
+__all__ = ["check_camera", "check_frames_live", "check_fiducial", "check_camera_stability"]

@@ -21,6 +21,8 @@ class PreflightContext:
     source: str
     log_path: str
     board_port: int | None = None
+    # Seconds the ``camera_stability`` check samples the fiducial center for drift.
+    drift_s: float = 5.0
     # Filled by the checks as they run (``config`` then ``camera``/``frames_live``).
     station_config: object | None = None
     raw_config: dict | None = None

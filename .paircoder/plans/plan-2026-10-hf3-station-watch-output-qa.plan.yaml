@@ -1,0 +1,47 @@
+id: plan-2026-10-hf3-station-watch-output-qa
+metadata:
+  cli_channel: stable
+  source_backlog: /Users/kevinmasterson/Projects/station-watch/plans/backlogs/HF3-station-watch-output-qa.md
+phases:
+- execution: parallel
+  id: 1
+  tasks:
+  - HF3.1
+  - HF3.2
+  - HF3.8
+- execution: parallel
+  id: 2
+  tasks:
+  - HF3.14
+  - HF3.15
+  - HF3.3
+  - HF3.4
+- execution: parallel
+  id: 3
+  tasks:
+  - HF3.5
+  - HF3.9
+- execution: parallel
+  id: 4
+  tasks:
+  - HF3.10
+  - HF3.16
+  - HF3.6
+- execution: parallel
+  id: 5
+  tasks:
+  - HF3.11
+  - HF3.12
+  - HF3.7
+- id: 6
+  tasks:
+  - HF3.13
+- id: 7
+  tasks:
+  - HF3.17
+- id: 8
+  tasks:
+  - HF3.18
+status: in_progress
+title: Sprint 3
+type: feature
