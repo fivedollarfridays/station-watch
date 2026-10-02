@@ -116,13 +116,12 @@ def _f(states, *, motion=False, hide=False, details=None):
     return spec
 
 
-def _stall_script():
-    """Short motion/still cycles (closed steps, each still under the window) then a
-    final long still that actually stalls -- the only clip that should fault stalled."""
+def _cycles(repeats: int, motion: int, still: int) -> list[dict]:
+    """``repeats`` motion runs, each closed by a still run: closed steps, none stalled."""
     cycles: list[dict] = []
-    for _ in range(3):
-        cycles += [_f(_BOTH, motion=True)] * 6 + [_f(_BOTH)] * 6
-    return cycles + [_f(_BOTH, motion=True)] * 6 + [_f(_BOTH)] * 60  # final still starts at 42
+    for _ in range(repeats):
+        cycles += [_f(_BOTH, motion=True)] * motion + [_f(_BOTH)] * still
+    return cycles
 
 
 def _both():
@@ -174,20 +173,26 @@ def _blind_clip() -> dict:
 def clip_specs() -> list[dict]:
     """Each clip: session, name, render script, ground-truth labels, keep-out backend.
 
-    Non-stall clips run continuous motion so the station zone never falsely stalls
-    (the Judge's stall is wall-time since the last motion, so a quiet clip would).
+    Non-stall clips run continuous motion (``normal`` short motion/still cycles that
+    end in motion) so the station zone never falsely stalls (the Judge's stall is
+    wall-time since the last motion, so a long quiet stretch would).
     """
     missing = _clip("s1", "missing", _moving(_MISS, 48), 47)
     missing["target_states"] = [("rail_pos_1", "absent"), ("rail_pos_2", "present")]
     stall = {"stalls": [{"start_frame": 42, "end_frame": 101}]}
+    # Short motion/still cycles (each still under the window), then a final long
+    # still that actually stalls -- the only clip that should fault stalled.
+    stall_script = _cycles(3, 6, 6) + [_f(_BOTH, motion=True)] * 6 + [_f(_BOTH)] * 60
     keepout = {"keepouts": [{"zone": "zone_press", "start_frame": 14, "end_frame": 31}]}
     return [
-        _clip("s1", "normal", _moving(_BOTH, 48), 47),
+        # Normal work: closed motion/still steps (the step-time baseline measures
+        # them; continuous motion would close none), ending in motion. 48 frames.
+        _clip("s1", "normal", _cycles(3, 8, 6) + _moving(_BOTH, 6), 47),
         missing,
         _blind_clip(),
         _detail_clip("s1", "detail_missing_stripe", "torque_stripe"),
         _detail_clip("s1", "detail_missing_label", "label"),
-        _clip("s2", "stall", _stall_script(), 101, stall),
+        _clip("s2", "stall", stall_script, 101, stall),
         _clip("s2", "keepout", _moving(_BOTH, 32), 31, keepout, backend=("enter", 6)),
     ]
 

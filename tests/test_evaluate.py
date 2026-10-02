@@ -280,3 +280,18 @@ def test_synthetic_subprocess_scores_detail_targets_in_the_confusion_matrix(tmp_
     )
     assert off_diagonal == 0, conf
     assert _provenance(eval_out / "detect.json")["clips"] == 7
+
+
+# --- the step-time baseline is a real measurement, not a degenerate 0.0 s ----------
+
+
+def test_synthetic_step_times_measures_closed_steps(synth):
+    data = json.loads((synth / "step_times.json").read_text())
+    assert data["metrics"]["count"] > 0, data
+    assert data["metrics"]["p95_s"] > 0.0
+
+
+def test_committed_synthetic_step_times_is_not_degenerate():
+    committed = Path(__file__).resolve().parents[1] / "measurements/synthetic/step_times.json"
+    metrics = json.loads(committed.read_text())["metrics"]
+    assert metrics["count"] > 0 and metrics["p95_s"] > 0.0, metrics

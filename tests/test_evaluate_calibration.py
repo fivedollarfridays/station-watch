@@ -250,7 +250,12 @@ def _run_cli(*args, timeout=240):
 def _render(clips_dir, session, name, frames):
     path, _truth = write_synth_station_clip(
         clips_dir / session / name,
-        [{"positions": {"rail_pos_1": "present", "rail_pos_2": "present"}} for _ in range(frames)],
+        # Motion/still runs of four frames: closed steps, so the calibration run
+        # measures a real step-time baseline (a zero-step file is refused).
+        [
+            {"positions": {"rail_pos_1": "present", "rail_pos_2": "present"}, "motion": i % 8 < 4}
+            for i in range(frames)
+        ],
         rail_positions=RAIL,
         station_zone=STATION_ZONE,
         fps=20.0,
@@ -286,7 +291,7 @@ def _real_config(path, *, step_times_path=None):
             "persistence_frames": 2,
             "emit_interval_s": 5.0,
             "rail_positions": RAIL,
-            "station_zone": STATION_ZONE,
+            "station_zone": {**STATION_ZONE, "track_motion": True},
             "keepout_rois": {},
             "blur_threshold": 100.0,
             "darkness_threshold": 40.0,

@@ -97,25 +97,42 @@ def step_stats(durations) -> dict:
     }
 
 
+_NO_STEPS = "no_steps_measured"
+
+
 def write_step_times(path: str | Path, stats: dict, provenance: dict) -> None:
-    """Write the committed ``step_times.json`` (the evaluation harness's producer of the file)."""
-    payload = {
-        "provenance": dict(provenance),
-        "metrics": {
+    """Write the committed ``step_times.json`` (the evaluation harness's producer of the file).
+
+    With no closed step measured, the file is a ``no_steps_measured`` status with no
+    ``metrics`` key (K13), never a 0.0 s p95 that would collapse the stall window.
+    """
+    payload: dict = {"provenance": dict(provenance)}
+    if int(stats["count"]) <= 0:
+        payload["status"] = _NO_STEPS
+        payload["reason"] = "no closed motion -> no_motion step in the normal calibration clips"
+    else:
+        payload["metrics"] = {
             "count": int(stats["count"]),
             "p50_s": float(stats["p50_s"]),
             "p95_s": float(stats["p95_s"]),
-        },
-    }
+        }
     Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 def read_step_times(path: str | Path) -> dict:
-    """Read a ``step_times.json`` and return its ``metrics`` mapping."""
+    """Read a ``step_times.json`` and return its ``metrics`` mapping.
+
+    A status file with no numbers, or a zero-count / non-positive p95 one, raises
+    ``ValueError`` naming why: it is not a measured stall window.
+    """
     data = json.loads(Path(path).read_text())
+    if "metrics" not in data:
+        raise ValueError(f"no measured steps (status {data.get('status', 'missing')})")
     metrics = data["metrics"]
     # Touch the keys the stall window needs so a malformed file fails here, named.
     _ = metrics["count"], metrics["p50_s"], metrics["p95_s"]
+    if int(metrics["count"]) <= 0 or float(metrics["p95_s"]) <= 0.0:
+        raise ValueError(f"no measured steps (count {metrics['count']}, p95 {metrics['p95_s']})")
     return metrics
 
 

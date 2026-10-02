@@ -1,18 +1,18 @@
 {
   "metrics": {
-    "count": 0,
-    "p50_s": 0.0,
-    "p95_s": 0.0
+    "count": 3,
+    "p50_s": 0.1121,
+    "p95_s": 0.1129
   },
   "provenance": {
     "clip_sha256s": [
-      "054adb9bfbc7ddade41d342ba72263d51a52117c830208a64c6fe84a49565f48",
-      "0b01d6ec7862c17e683763cec499e90220af614911e2a9c563fe8098486ee60f",
-      "35b23dfd4a0259a41921d11e6fe05f8e419d1726548e2882de07cd0e7e37db57",
-      "3e8be184fa216267dd32ba5a908e874df3add7f6a9ce83c0df954dd00ed59a73",
-      "8ac92c05df6b37d4fa831783e145647fb9dfbf17771a4b18c220576d4ddd42f7",
-      "cc40794cad2833ac38ef3f9cabb0a7e86f9c7543b063aa6d71c765046c7261ac",
-      "d064e12b195d99a56e4a8a1260fc360824370ea146393db8aac57854101ab1d1"
+      "1d09afe5afcd15512f69e49eae3e63a2174b9fd53acad45064283badbf96de11",
+      "56a1f00336d18bf5ac0564591c8d12a049bc4b37cf61080f1aa322ad70030727",
+      "7441acb62dce96ed33185cc299ff94fc477817d5e7ef3b1a90f3cba1f13c201a",
+      "9f7a18a0e6ef400b3391cc2b8e2bdb05c7b2856d11c08a93b06ec11f2184e35c",
+      "b920f6f6490dd3c97b893a897764491605d2a658ec0096d3e728b87a06886530",
+      "d1f4115af7118e187c0567544c3ad61d5767c8a4ca8d903ccdf2dd02ac71d631",
+      "e1f648ebeae65c7fa8a8ae35d79e9a77a63ef3bb6982a42306f576d9561a0bf9"
     ],
     "clips": 7,
     "config_sha256": "823f06810a126523b9fac14c53eac3c93dfbc175d6c8c9bdf05a606aeb2ff87c",
@@ -20,7 +20,7 @@
     "dataset_kind": "synthetic",
     "date_utc": "2026-10-02",
     "detector": "station_watch.detect:real-pipeline:v1",
-    "git_commit": "47148370240592160c337020574ad95b0a5e1fb9",
+    "git_commit": "81b89ee1b0c9468e39b29c12a344bdd8cf78b794",
     "manifest_sha256": "3ca83899d5ef694e54958fd89b43808336fe4229c1436afe5e1641b6964f2b79",
     "recorded_on": {
       "s1": null,
