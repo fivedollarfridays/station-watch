@@ -429,6 +429,47 @@ def test_missing_torque_stripe_faults_once_and_recovers_when_restored(tmp_path):
     assert any(v.state is VerdictState.HEALTHY for v in verdicts), "restoring the stripe recovers"
 
 
+# --- HF3.16: a missing label faults through the registry, no new wiring -------------
+
+LABEL_REGION = [[0.80, 1.92], [1.60, 1.92], [1.60, 2.04], [0.80, 2.04]]
+
+
+def test_missing_label_faults_once_with_the_detail_target_registry_carried(tmp_path):
+    # rail_pos_1's label is required. The component is present throughout; the label is
+    # missing the whole clip. The label kind is live purely by being registered -- the
+    # config names it in required_slots and slot_details, and the exact same run path that
+    # carries the torque stripe raises exactly one missing_part:rail_pos_1.label episode.
+    config = _write_config(
+        tmp_path / "station.yaml",
+        required_slots=["rail_pos_1.label"],
+        detect={"rail_positions": RAIL, "slot_details": {"rail_pos_1": {"label": LABEL_REGION}}},
+    )
+    script = [
+        {
+            "positions": {"rail_pos_1": "present", "rail_pos_2": "present"},
+            "details": {"rail_pos_1": {"label": "absent"}},
+        }
+        for _ in range(40)
+    ]
+    clip = _clip(tmp_path, "label", script, fps=20.0)
+
+    verdicts, alarms = _run_scenario(tmp_path, clip, config)
+
+    missing_faults = [
+        f
+        for v in verdicts
+        if v.state is VerdictState.FAULT
+        for f in v.faults
+        if f.kind is FaultKind.MISSING_PART
+    ]
+    assert missing_faults, "the missing label raises missing_part (read back from the Log)"
+    assert {f.target for f in missing_faults} == {"rail_pos_1.label"}, "exactly the label detail"
+    assert all(
+        f.frame_ids and all(0 <= fid < len(script) for fid in f.frame_ids) for f in missing_faults
+    ), "the fault cites frames that exist in the clip"
+    assert [a["cause"] for a in alarms] == ["missing_part:rail_pos_1.label"], "exactly one episode"
+
+
 def test_watchdog_fires_the_alarm_stage_beside_a_detect_enabled_run(tmp_path):
     config = _write_config(
         tmp_path / "station.yaml", required_slots=list(RAIL), detect={"rail_positions": RAIL}

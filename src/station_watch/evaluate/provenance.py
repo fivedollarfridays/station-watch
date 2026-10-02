@@ -55,15 +55,31 @@ def confine_out(out: Path, dataset_kind: str, *, force_out: bool = False) -> Pat
     raise ValueError(f"refusing to write {resolved}: {rule}")
 
 
-def write_measurement(path: str | Path, provenance: dict, metrics: dict) -> None:
+def write_measurement(
+    path: str | Path,
+    provenance: dict,
+    metrics: dict | None = None,
+    *,
+    status: str | None = None,
+    reason: str | None = None,
+) -> None:
     """Write one measurement file in the one format: ``{provenance, metrics}``.
 
     The single writer every measurement file goes through (the evaluate harness and
     the fault drill both call it), so there is never a second on-disk shape for the
     claims test to chase -- metric keys stay addressable as dotted paths under
-    ``metrics``.
+    ``metrics``. A caller with no numbers to record (an ``audit score`` session that
+    failed QA or carried no reviewed flags) passes ``status`` (and optionally
+    ``reason``) instead: it lands at the top level beside ``provenance`` and the
+    ``metrics`` key is omitted, so the file is still this one format, not a second.
     """
-    payload = {"provenance": provenance, "metrics": metrics}
+    payload: dict = {"provenance": provenance}
+    if status is not None:
+        payload["status"] = status
+    if reason is not None:
+        payload["reason"] = reason
+    if metrics is not None:
+        payload["metrics"] = metrics
     Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 

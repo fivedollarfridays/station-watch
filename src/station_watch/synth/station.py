@@ -50,9 +50,15 @@ _KEEPOUT_ROIS = {
 }
 _COMPONENT_COLORS = {"rail_pos_1": (200, 120, 60), "rail_pos_2": (60, 180, 90)}
 _DEFAULT_COLOR = (170, 170, 170)
-# Paint-pen colours drawn for each detail kind (BGR); torque_stripe is a vivid yellow
-# whose hue (~30) sits in the reader's default torque_stripe hue_range.
-_DETAIL_COLORS = {"torque_stripe": (0, 255, 255)}
+# Colours drawn for each detail kind (BGR): torque_stripe is a vivid yellow whose hue
+# (~30) sits in the reader's default hue_range; label is a near-white band; ferrule is a
+# desaturated silver sleeve (its crimp ridges, drawn below, give it edge density).
+_DETAIL_COLORS = {
+    "torque_stripe": (0, 255, 255),
+    "label": (236, 236, 236),
+    "ferrule": (200, 200, 200),
+}
+_FERRULE_RIDGE = (120, 120, 120)
 _SKIN = (120, 150, 200)
 _TOOL = (40, 40, 40)
 _SHIFT_PX = 12
@@ -101,11 +107,18 @@ def _draw_component(frame, poly, color, state) -> None:
     cv2.rectangle(frame, (int(x0), int(y0 + dy)), (int(x1), int(y1 + dy)), color, -1)
 
 
-def _draw_detail(frame, poly, color) -> None:
-    """A filled paint-pen detail (e.g. a torque stripe) drawn on the component."""
+def _draw_detail(frame, poly, kind) -> None:
+    """A filled detail (torque stripe / label / ferrule) drawn on the component.
+
+    The ferrule's crimp ridges are drawn over its silver fill so it carries the edge
+    density its reader gates on -- what tells a metal sleeve from a flat white label.
+    """
     x0, y0 = poly.min(axis=0)
     x1, y1 = poly.max(axis=0)
-    cv2.rectangle(frame, (int(x0), int(y0)), (int(x1), int(y1)), color, -1)
+    cv2.rectangle(frame, (int(x0), int(y0)), (int(x1), int(y1)), _DETAIL_COLORS[kind], -1)
+    if kind == "ferrule":
+        for x in range(int(x0) + 2, int(x1), 3):
+            cv2.line(frame, (x, int(y0)), (x, int(y1)), _FERRULE_RIDGE, 1)
 
 
 def _draw_blob(frame, poly, color) -> None:
@@ -176,7 +189,7 @@ def _render_frame(spec, frame_id, ctx) -> np.ndarray:
     for pid, kinds in spec.get("details", {}).items():
         for kind, detail_state in kinds.items():
             if detail_state == "present":
-                _draw_detail(frame, ctx["detail_polys"][pid][kind], _DETAIL_COLORS[kind])
+                _draw_detail(frame, ctx["detail_polys"][pid][kind], kind)
     for zid in ctx["zone_ids"]:
         if spec.get("keepout", {}).get(zid):
             _draw_blob(frame, ctx["keepout_polys"][zid], _SKIN)

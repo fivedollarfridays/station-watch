@@ -89,7 +89,13 @@ def _duration(opened_ts: str, closed_ts: str | None) -> str:
     return f"{seconds:.3f}s"
 
 
-def _flag_section(flag: AuditFlag, cells: list[FrameCell]) -> str:
+def flag_body(flag: AuditFlag, cells: list[FrameCell]) -> str:
+    """The escaped inner HTML for one flag -- its heading, metadata and frame cells.
+
+    The shared body both the static ``audit build`` sheet and the HF3.6 ``audit
+    review`` page wrap in their own ``<section>`` (review adds a verdict control). Every
+    interpolated value is run through :func:`esc`.
+    """
     closed = flag.closed_ts if flag.closed_ts is not None else "—"
     rows = [
         f"<h2>{esc(flag.kind)} &middot; {esc(flag.target)}</h2>",
@@ -103,7 +109,11 @@ def _flag_section(flag: AuditFlag, cells: list[FrameCell]) -> str:
     ]
     if cells:
         rows.append('<div class="frames">' + "".join(_frame_cell(c) for c in cells) + "</div>")
-    return "<section>\n" + "\n".join(rows) + "\n</section>"
+    return "\n".join(rows)
+
+
+def _flag_section(flag: AuditFlag, cells: list[FrameCell]) -> str:
+    return "<section>\n" + flag_body(flag, cells) + "\n</section>"
 
 
 def _frame_cell(cell: FrameCell) -> str:
@@ -119,4 +129,4 @@ def _frame_cell(cell: FrameCell) -> str:
     return f'<div class="frame">{head}{img}{note}</div>'
 
 
-__all__ = ["esc", "data_uri", "render_sheet", "FrameCell"]
+__all__ = ["esc", "data_uri", "render_sheet", "flag_body", "FrameCell"]

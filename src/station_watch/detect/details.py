@@ -1,22 +1,34 @@
-"""Component *detail* reads: the torque stripe now, label and ferrule next (HF3.16).
+"""Component *detail* reads: the torque stripe, the label, and the ferrule (HF3.16).
 
 PLAN 5.1's bench checks beyond "component present and seated" are per-component
 details: a torque stripe (a paint-pen mark across a termination), a printed label, a
-ferrule. This module reads them with one open registry so a new kind is added by
+ferrule. This module reads all three with one open registry so a new kind is added by
 registering a method, never by editing callers.
 
 :func:`read_detail` is pure: given a frame, a pixel polygon and a detail kind it
 returns a :class:`DetailReading` (``present`` / ``absent`` / ``unknown``). The four
 unknown-cause gates (out_of_frame / dark / blurred / occluded) are the *shared*
 :func:`station_watch.detect.regions.read_region_quality` -- the same checks rail
-positions use, never copied -- so a dim, blurred or hand-covered stripe reads
+positions use, never copied -- so a dim, blurred or hand-covered detail reads
 ``unknown`` with the matching cause and a lowered confidence ceiling (K3). Each
 reading also carries its raw scores (K4).
 
-The ``torque_stripe`` method reads the fraction of the region whose HSV hue sits in a
-configured paint-pen ``hue_range`` (and is colourful enough to not be bare rail); it
-is ``present`` when that fill clears ``min_fill``. Both thresholds live in
-``detect.details.torque_stripe`` with the documented defaults below.
+Each registered method decides ``present`` / ``absent`` from one clean crop:
+
+* ``torque_stripe`` -- the fraction of the region whose HSV hue sits in a configured
+  paint-pen ``hue_range`` (and is colourful enough to not be bare rail); ``present``
+  when that fill clears ``detect.details.torque_stripe.min_fill``.
+* ``label`` -- the heat-shrink label is near-white: the fraction of the region that is
+  bright and desaturated (value over ``_LABEL_MIN_VALUE``, saturation under
+  ``_LABEL_MAX_SATURATION``); ``present`` when that fill clears
+  ``detect.details.label.min_fill``.
+* ``ferrule`` -- a crimped metal sleeve at the wire end is bright and desaturated
+  (metallic) *and* carries the high edge density of its crimp ridges; ``present`` when
+  the metallic fill clears ``detect.details.ferrule.min_fill`` *and* the Canny edge
+  density clears ``detect.details.ferrule.min_edge_density``.
+
+Every method's thresholds live under ``detect.details.<kind>`` with the documented
+defaults registered beside each method below.
 
 :class:`DetailTracker` follows the Detector tracker protocol and reuses
 :class:`~station_watch.detect.persistence.PersistenceEngine` for N-frame persistence
@@ -47,6 +59,17 @@ CAUSE_PARENT_NOT_PRESENT = "parent_not_present"
 _MIN_SATURATION = 80
 _MIN_VALUE = 80
 
+# Intrinsic to the label method: a heat-shrink label is near-white -- bright and
+# desaturated -- so a saturated component colour beneath it never reads as label.
+_LABEL_MAX_SATURATION = 60
+_LABEL_MIN_VALUE = 170
+
+# Intrinsic to the ferrule method: a crimped metal sleeve is bright and desaturated
+# (metallic). Its crimp ridges, not its colour, tell it from a flat label -- hence the
+# edge-density gate alongside the metallic fill.
+_FERRULE_MAX_SATURATION = 60
+_FERRULE_MIN_VALUE = 140
+
 
 @dataclass(frozen=True)
 class DetailReading:
@@ -72,11 +95,21 @@ _METHODS: dict[str, DetailMethod] = {}
 DETAIL_KINDS: tuple[str, ...] = ()
 
 # Default detail regions (position id -> kind -> marker-unit quad). These match what
-# the synthetic renderer draws, so a drawn stripe and the region it is read from are
-# the same bench spot. HF3.16 extends this with label and ferrule regions.
+# the synthetic renderer draws, so a drawn detail and the region it is read from are
+# the same bench spot. Each kind sits on its own band of the component: the label
+# above the torque stripe, the ferrule below it, all inside the rail-position block so
+# an un-drawn detail reads the component colour (absent), never bare rail.
 DEFAULT_DETAIL_REGIONS: dict[str, dict[str, list]] = {
-    "rail_pos_1": {"torque_stripe": [[0.85, 2.05], [1.55, 2.05], [1.55, 2.25], [0.85, 2.25]]},
-    "rail_pos_2": {"torque_stripe": [[2.65, 2.05], [3.35, 2.05], [3.35, 2.25], [2.65, 2.25]]},
+    "rail_pos_1": {
+        "label": [[0.80, 1.92], [1.60, 1.92], [1.60, 2.04], [0.80, 2.04]],
+        "torque_stripe": [[0.85, 2.05], [1.55, 2.05], [1.55, 2.25], [0.85, 2.25]],
+        "ferrule": [[0.85, 2.30], [1.55, 2.30], [1.55, 2.44], [0.85, 2.44]],
+    },
+    "rail_pos_2": {
+        "label": [[2.60, 1.92], [3.40, 1.92], [3.40, 2.04], [2.60, 2.04]],
+        "torque_stripe": [[2.65, 2.05], [3.35, 2.05], [3.35, 2.25], [2.65, 2.25]],
+        "ferrule": [[2.65, 2.30], [3.35, 2.30], [3.35, 2.44], [2.65, 2.44]],
+    },
 }
 
 
@@ -92,6 +125,35 @@ def method_name(kind: str) -> str:
     return _METHODS[kind].name
 
 
+def _read_label(crop: np.ndarray, config: dict) -> tuple[str, dict]:
+    """Fraction of the region that is near-white: bright and desaturated (heat-shrink label)."""
+    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+    sat, val = hsv[..., 1], hsv[..., 2]
+    near_white = (sat <= _LABEL_MAX_SATURATION) & (val >= _LABEL_MIN_VALUE)
+    fill = float(near_white.mean())
+    state = "present" if fill >= config["min_fill"] else "absent"
+    scores = {"fill_fraction": round(fill, 4), "min_fill": config["min_fill"]}
+    return state, scores
+
+
+def _read_ferrule(crop: np.ndarray, config: dict) -> tuple[str, dict]:
+    """Fraction of bright, desaturated metallic pixels, gated on crimp-ridge edge density."""
+    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+    sat, val = hsv[..., 1], hsv[..., 2]
+    metallic = (sat <= _FERRULE_MAX_SATURATION) & (val >= _FERRULE_MIN_VALUE)
+    fill = float(metallic.mean())
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    edge_density = float((cv2.Canny(gray, 50, 150) > 0).mean())
+    present = fill >= config["min_fill"] and edge_density >= config["min_edge_density"]
+    scores = {
+        "fill_fraction": round(fill, 4),
+        "edge_density": round(edge_density, 4),
+        "min_fill": config["min_fill"],
+        "min_edge_density": config["min_edge_density"],
+    }
+    return ("present" if present else "absent"), scores
+
+
 def _read_torque_stripe(crop: np.ndarray, config: dict) -> tuple[str, dict]:
     """Fraction of the region whose HSV hue is in the configured paint-pen range."""
     hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
@@ -104,6 +166,24 @@ def _read_torque_stripe(crop: np.ndarray, config: dict) -> tuple[str, dict]:
     return state, scores
 
 
+# Registered in the order HF3.17 consumes: ``DETAIL_KINDS == ("label", "ferrule",
+# "torque_stripe")``. Each name is versioned so a method change is visible in the Log.
+register_detail_method(
+    "label",
+    DetailMethod(
+        name="label:white_fill:v1",
+        defaults={"min_fill": 0.3},
+        read=_read_label,
+    ),
+)
+register_detail_method(
+    "ferrule",
+    DetailMethod(
+        name="ferrule:metallic_edges:v1",
+        defaults={"min_fill": 0.2, "min_edge_density": 0.04},
+        read=_read_ferrule,
+    ),
+)
 register_detail_method(
     "torque_stripe",
     DetailMethod(

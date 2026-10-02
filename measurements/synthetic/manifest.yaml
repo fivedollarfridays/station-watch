@@ -42,6 +42,50 @@ sessions:
       start_frame: 16
       state: unknown
       target: rail_pos_2
+  - path: s1/detail_missing_stripe/clip.mkv
+    positions:
+    - end_frame: 47
+      start_frame: 0
+      state: present
+      target: rail_pos_1
+    - end_frame: 47
+      start_frame: 0
+      state: present
+      target: rail_pos_2
+    - end_frame: 47
+      start_frame: 0
+      state: absent
+      target: rail_pos_1.torque_stripe
+    - end_frame: 47
+      start_frame: 0
+      state: present
+      target: rail_pos_1.label
+    - end_frame: 47
+      start_frame: 0
+      state: present
+      target: rail_pos_1.ferrule
+  - path: s1/detail_missing_label/clip.mkv
+    positions:
+    - end_frame: 47
+      start_frame: 0
+      state: present
+      target: rail_pos_1
+    - end_frame: 47
+      start_frame: 0
+      state: present
+      target: rail_pos_2
+    - end_frame: 47
+      start_frame: 0
+      state: present
+      target: rail_pos_1.torque_stripe
+    - end_frame: 47
+      start_frame: 0
+      state: absent
+      target: rail_pos_1.label
+    - end_frame: 47
+      start_frame: 0
+      state: present
+      target: rail_pos_1.ferrule
   id: s1
 - clips:
   - path: s2/stall/clip.mkv

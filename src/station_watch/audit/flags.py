@@ -16,12 +16,30 @@ The Log is read-only through :class:`~station_watch.board.reader.LogReader`;
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 
 from station_watch.records import BlindState
 
 # SQLite reads LIMIT -1 as "every row": a session's whole verdict/blind history.
 _ALL = -1
+
+# The file ``audit build`` writes and HF3.6/HF3.7 read back (a list of flag dicts).
+FLAGS_FILE = "flags.json"
+
+
+def load_flags_json(audit_dir) -> list[dict]:
+    """Read ``<audit dir>/flags.json`` back into the list of flag dicts build wrote.
+
+    Each dict carries the :class:`AuditFlag` fields (``flag_id``, ``kind``, ``target``,
+    ``station_id``, ``run_id``, ``opened_ts``, ``closed_ts``, ``frame_ids``). Raises
+    ``OSError`` if the file is missing and ``ValueError`` if it is not a JSON list.
+    """
+    data = json.loads((Path(audit_dir) / FLAGS_FILE).read_text())
+    if not isinstance(data, list):
+        raise ValueError(f"{FLAGS_FILE} must be a JSON list of flags, got {type(data).__name__}")
+    return data
 
 
 @dataclass(frozen=True)
@@ -134,4 +152,4 @@ def _finish_blind(episode) -> AuditFlag:
     )
 
 
-__all__ = ["AuditFlag", "collect_flags"]
+__all__ = ["AuditFlag", "collect_flags", "load_flags_json", "FLAGS_FILE"]

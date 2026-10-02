@@ -11,7 +11,14 @@ from __future__ import annotations
 
 import numpy as np
 
+from station_watch.detect.details import DEFAULT_DETAIL_REGIONS
 from station_watch.detect.geometry import region_to_pixels
+
+# The three detail kinds, read on rail_pos_1 at their default regions. Configured as
+# slot_details (so the DetailTracker reads and scores them) but not required -- a missing
+# detail here is scored in the rail confusion matrix, not faulted (HF3.16).
+SLOT_DETAILS = {"rail_pos_1": dict(DEFAULT_DETAIL_REGIONS["rail_pos_1"])}
+_DETAIL_KINDS = ("torque_stripe", "label", "ferrule")
 
 DATASET = "synthetic-proving"
 SPEED = 4.0
@@ -89,6 +96,7 @@ def config_dict() -> dict:
             "darkness_threshold": 40.0,
             "occlusion_threshold": 0.5,
             "unknown_grace_s": 10_000.0,
+            "slot_details": SLOT_DETAILS,
         },
     }
 
@@ -97,12 +105,14 @@ _BOTH = {"rail_pos_1": "present", "rail_pos_2": "present"}
 _MISS = {"rail_pos_1": "absent", "rail_pos_2": "present"}
 
 
-def _f(states, *, motion=False, hide=False):
+def _f(states, *, motion=False, hide=False, details=None):
     spec = {"positions": dict(states)}
     if motion:
         spec["motion"] = True
     if hide:
         spec["hide_marker"] = True
+    if details:
+        spec["details"] = {"rail_pos_1": dict(details)}
     return spec
 
 
@@ -127,6 +137,27 @@ def _clip(session, name, script, last, labels=None, **extra) -> dict:
 
 def _moving(states, n, **kw) -> list[dict]:
     return [_f(states, motion=True, **kw) for _ in range(n)]
+
+
+def _detail_positions(last, states) -> list[dict]:
+    """Manifest ``positions`` entries for rail_pos_1's detail targets over the whole clip."""
+    return [
+        {"target": f"rail_pos_1.{kind}", "state": state, "start_frame": 0, "end_frame": last}
+        for kind, state in states.items()
+    ]
+
+
+def _detail_clip(session, name, missing_kind) -> dict:
+    """A both-present clip with every rail_pos_1 detail drawn except ``missing_kind``.
+
+    Scores the detail targets in the rail confusion matrix: the two drawn kinds read
+    present, the omitted one reads absent. Components stay present and the clip runs
+    continuous motion, so no part/stall/keep-out fault fires -- only the detail reads
+    differ (HF3.16). ``missing_kind`` is not required, so a missing detail is measured,
+    not faulted."""
+    states = {kind: ("absent" if kind == missing_kind else "present") for kind in _DETAIL_KINDS}
+    script = _moving(_BOTH, 48, details=states)
+    return _clip("s1", name, script, 47, extra_positions=_detail_positions(47, states))
 
 
 def _blind_clip() -> dict:
@@ -154,6 +185,8 @@ def clip_specs() -> list[dict]:
         _clip("s1", "normal", _moving(_BOTH, 48), 47),
         missing,
         _blind_clip(),
+        _detail_clip("s1", "detail_missing_stripe", "torque_stripe"),
+        _detail_clip("s1", "detail_missing_label", "label"),
         _clip("s2", "stall", _stall_script(), 101, stall),
         _clip("s2", "keepout", _moving(_BOTH, 32), 31, keepout, backend=("enter", 6)),
     ]
@@ -172,6 +205,7 @@ __all__ = [
     "KEEPOUT",
     "MARKER_CORNERS",
     "RAIL",
+    "SLOT_DETAILS",
     "SPEED",
     "STATION_ZONE",
     "ClearBackend",

@@ -13,7 +13,7 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from station_watch.audit.flags import collect_flags
+from station_watch.audit.flags import FLAGS_FILE, collect_flags
 from station_watch.audit.html import render_sheet
 from station_watch.audit.overlay import collect_regions
 from station_watch.audit.thumbnails import ThumbContext, resolve_cell
@@ -43,7 +43,7 @@ def build_audit(*, config_path, log_path, evidence_dir, clip, out) -> int:
     title = f"station-watch audit — {config.station_id} ({run_id})"
     out_dir = Path(out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "flags.json").write_text(json.dumps([asdict(f) for f in flags], indent=2) + "\n")
+    (out_dir / FLAGS_FILE).write_text(json.dumps([asdict(f) for f in flags], indent=2) + "\n")
     (out_dir / "index.html").write_text(render_sheet(title, rendered))
     return 0
 
