@@ -20,7 +20,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from station_watch.records import BlindState
+from station_watch.board.reader import UndecodableRow
+from station_watch.records import BlindRecord, BlindState, Verdict
 
 # SQLite reads LIMIT -1 as "every row": a session's whole verdict/blind history.
 _ALL = -1
@@ -60,17 +61,33 @@ def collect_flags(reader) -> list[AuditFlag]:
     """Every fault and blind episode of the Log, in a deterministic order.
 
     Verdicts and blind records are walked oldest-first (``iter_newest`` is
-    newest-first, so each list is reversed). The result is sorted by
+    newest-first). A row the reader could not rebuild is its own
+    ``unknown:undecodable`` flag and takes no part in episode pairing. The result is sorted by
     ``(opened_ts, kind, target, flag_id)`` so the list -- and so ``flags.json`` --
     is byte-identical across two builds of the same Log.
     """
-    verdicts = list(reader.iter_newest("verdict", limit=_ALL))
-    verdicts.reverse()
-    blinds = list(reader.iter_newest("blind", limit=_ALL))
-    blinds.reverse()
-    flags = _fault_flags(verdicts) + _blind_flags(blinds)
+    verdict_rows = list(reversed(list(reader.iter_newest("verdict", limit=_ALL))))
+    blind_rows = list(reversed(list(reader.iter_newest("blind", limit=_ALL))))
+    bad = [r for r in verdict_rows + blind_rows if isinstance(r, UndecodableRow)]
+    verdicts = [r for r in verdict_rows if isinstance(r, Verdict)]
+    blinds = [r for r in blind_rows if isinstance(r, BlindRecord)]
+    flags = _fault_flags(verdicts) + _blind_flags(blinds) + [_unknown_flag(r) for r in bad]
     flags.sort(key=lambda f: (f.opened_ts, f.kind, f.target, f.flag_id))
     return flags
+
+
+def _unknown_flag(row: UndecodableRow) -> AuditFlag:
+    """A row the reader could not rebuild: listed as its own UNKNOWN flag, never dropped."""
+    return AuditFlag(
+        flag_id=row.record_id,
+        kind="unknown:undecodable",
+        target=row.reason,
+        station_id="",
+        run_id=row.run_id,
+        opened_ts=row.ts,
+        closed_ts=None,
+        frame_ids=(),
+    )
 
 
 def _fault_flags(verdicts) -> list[AuditFlag]:

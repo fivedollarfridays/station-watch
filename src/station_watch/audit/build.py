@@ -17,7 +17,7 @@ from station_watch.audit.flags import FLAGS_FILE, collect_flags
 from station_watch.audit.html import render_sheet
 from station_watch.audit.overlay import collect_regions
 from station_watch.audit.thumbnails import ThumbContext, resolve_cell
-from station_watch.board.reader import LogReader
+from station_watch.board.reader import LogReader, UndecodableRow
 from station_watch.config import load_station_config
 from station_watch.evidence_index import EvidenceIndex
 
@@ -79,6 +79,8 @@ def _fingerprints(reader) -> dict[str, dict[int, str]]:
     """``run_id -> frame_id -> fingerprint`` (only needed for a ``--clip`` fallback)."""
     by_run: dict[str, dict[int, str]] = {}
     for frame in reader.iter_newest("frame", limit=_ALL):
+        if isinstance(frame, UndecodableRow):
+            continue  # no fingerprint to match a clip frame against
         by_run.setdefault(frame.run_id, {})[frame.frame_id] = frame.fingerprint
     return by_run
 

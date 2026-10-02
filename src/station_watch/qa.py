@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from station_watch.board.reader import BoardLogError, LogReader
+from station_watch.board.reader import BoardLogError, LogReader, UndecodableRow
 from station_watch.clock import parse_iso
 from station_watch.records import ObservationKind, VerdictState
 
@@ -142,6 +142,12 @@ def session_qa(config, log_path) -> SessionQA:
         return _fail(str(exc), max_unknown, max_target)
 
     verdicts.reverse()  # iter_newest is newest-first; walk oldest-first
+    bad = [v for v in verdicts if isinstance(v, UndecodableRow)]
+    if bad:
+        # The whole Log was walked; a session holding rows nobody can read is not
+        # one QA can vouch for (fail closed, naming them).
+        reason = f"{len(bad)} undecodable verdict row(s), first {bad[0].record_id}"
+        return _fail(reason, max_unknown, max_target)
     if not verdicts:
         return _fail("no verdicts", max_unknown, max_target)
 
