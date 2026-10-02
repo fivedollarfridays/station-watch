@@ -21,7 +21,9 @@ thousands of frame rows.
 
 from __future__ import annotations
 
+import json
 import sqlite3
+import sys
 import urllib.parse
 from collections.abc import Iterator
 from pathlib import Path
@@ -31,11 +33,26 @@ from station_watch.log import _KIND_ALIASES, _KIND_TO_CLASS, _kind_of
 # The most verdicts the held-time walk reads; a longer streak reads "held >= ...".
 HELD_WALK_LIMIT = 256
 
-_NEWEST_SQL = "SELECT body FROM records WHERE kind = ? ORDER BY ts DESC, rowid DESC LIMIT ?"
+_NEWEST_SQL = (
+    "SELECT record_id, body FROM records WHERE kind = ? ORDER BY ts DESC, rowid DESC LIMIT ?"
+)
 _NEWEST_MATCHING_SQL = (
-    "SELECT body FROM records WHERE kind = ? AND json_extract(body, ?) = ? "
+    "SELECT record_id, body FROM records WHERE kind = ? AND json_extract(body, ?) = ? "
     "ORDER BY ts DESC, rowid DESC LIMIT 1"
 )
+# The blind-reason lookup's expression is the *literal* ``json_extract(body,
+# '$.reason')``, so SQLite can answer it from the ``records_blind_reason``
+# expression index (the generic ``_NEWEST_MATCHING_SQL`` binds the path and
+# cannot match an expression index).
+_NEWEST_WITH_REASON_SQL = (
+    "SELECT record_id, body FROM records "
+    "WHERE kind = ? AND json_extract(body, '$.reason') = ? "
+    "ORDER BY ts DESC, rowid DESC LIMIT 1"
+)
+
+# Said once per process: a Log written before the blind-reason index existed
+# falls back to the generic scan (the read-only Board cannot add the index).
+_warned_no_reason_index = False
 
 
 def _readonly_uri(path: Path) -> str:
@@ -49,10 +66,19 @@ class BoardLogError(RuntimeError):
 
 
 def _rebuild(body: str):
-    import json
-
     data = json.loads(body)
     return _KIND_TO_CLASS[_kind_of(data["record_id"])].from_dict(data)
+
+
+def _warn_no_reason_index(path: Path) -> None:
+    """Say once, on stderr, that this Log predates the blind-reason index."""
+    global _warned_no_reason_index
+    if not _warned_no_reason_index:
+        _warned_no_reason_index = True
+        sys.stderr.write(
+            f"station-watch board: Log {path} predates the records_blind_reason index; "
+            "open-blind-reason lookups fall back to a full scan\n"
+        )
 
 
 class LogReader:
@@ -66,18 +92,30 @@ class LogReader:
             self._conn = sqlite3.connect(_readonly_uri(self._path), uri=True)
         except sqlite3.Error as exc:
             raise BoardLogError(f"log unreadable: {self._path}: {exc}") from exc
+        self._reason_index: bool | None = None
 
     @property
     def connection(self) -> sqlite3.Connection:
         """The underlying read-only connection (a write through it raises)."""
         return self._conn
 
-    def _bodies(self, sql: str, params: tuple) -> Iterator[str]:
+    def _rows(self, sql: str, params: tuple) -> Iterator[tuple[str, str]]:
         try:
-            for (body,) in self._conn.execute(sql, params):
-                yield body
+            yield from self._conn.execute(sql, params)
         except sqlite3.Error as exc:
             raise BoardLogError(f"log unreadable: {self._path}: {exc}") from exc
+
+    def _decode(self, record_id: str, body: str):
+        """Rebuild one stored row, naming the record id if its body cannot decode.
+
+        A row an older or drifted writer left behind -- an unknown record kind,
+        schema drift, or bad JSON -- becomes a ``BoardLogError`` the Board renders
+        as UNKNOWN, rather than an exception escaping onto the operator's screen.
+        """
+        try:
+            return _rebuild(body)
+        except (KeyError, ValueError, TypeError, IndexError) as exc:
+            raise BoardLogError(f"undecodable record {record_id}: {exc}") from exc
 
     def newest(self, kind: str):
         """The newest row of ``kind`` by canonical ts, or ``None`` if there is none."""
@@ -88,15 +126,42 @@ class LogReader:
     def newest_matching(self, kind: str, field: str, value: str):
         """The newest row of ``kind`` whose body ``field`` equals ``value`` (one row)."""
         params = (_KIND_ALIASES.get(kind, kind), f"$.{field}", value)
-        for body in self._bodies(_NEWEST_MATCHING_SQL, params):
-            return _rebuild(body)
+        for record_id, body in self._rows(_NEWEST_MATCHING_SQL, params):
+            return self._decode(record_id, body)
         return None
+
+    def newest_with_reason(self, kind: str, reason: str):
+        """The newest row of ``kind`` whose body ``reason`` equals ``reason``.
+
+        Index-backed by ``records_blind_reason``. A Log written before that index
+        existed falls back to the generic scan (said once on stderr); the result
+        is the same row either way.
+        """
+        if not self._has_reason_index():
+            _warn_no_reason_index(self._path)
+            return self.newest_matching(kind, "reason", reason)
+        params = (_KIND_ALIASES.get(kind, kind), reason)
+        for record_id, body in self._rows(_NEWEST_WITH_REASON_SQL, params):
+            return self._decode(record_id, body)
+        return None
+
+    def _has_reason_index(self) -> bool:
+        if self._reason_index is None:
+            self._reason_index = any(
+                True
+                for _ in self._rows(
+                    "SELECT 1 FROM sqlite_master "
+                    "WHERE type = 'index' AND name = 'records_blind_reason'",
+                    (),
+                )
+            )
+        return self._reason_index
 
     def iter_newest(self, kind: str, *, limit: int) -> Iterator:
         """At most ``limit`` rows of ``kind``, newest first, rebuilt into records."""
         params = (_KIND_ALIASES.get(kind, kind), limit)
-        for body in self._bodies(_NEWEST_SQL, params):
-            yield _rebuild(body)
+        for record_id, body in self._rows(_NEWEST_SQL, params):
+            yield self._decode(record_id, body)
 
     def close(self) -> None:
         self._conn.close()

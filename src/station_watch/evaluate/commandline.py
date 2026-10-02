@@ -42,6 +42,12 @@ def add_parser(sub) -> None:
     evaluate.add_argument(
         "--speed", type=float, help="playback speed (default: accelerated for --synthetic)"
     )
+    evaluate.add_argument(
+        "--split",
+        choices=["calibration", "held_out"],
+        default="calibration",
+        help="which split's clips to score; held_out runs the calibration-leak check first",
+    )
 
 
 def handle(args) -> int:
@@ -59,6 +65,7 @@ def handle(args) -> int:
         synthetic=args.synthetic,
         clips_dir=args.clips_dir,
         speed=args.speed,
+        split=args.split,
     )
 
 

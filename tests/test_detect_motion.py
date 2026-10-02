@@ -129,6 +129,42 @@ def test_still_live_zone_reads_no_motion_never_motion(tmp_path):
     assert no_motion[0].method != "fixture" and "frame_diff" in no_motion[0].method
 
 
+# --- marker jitter must never read as motion ---------------------------------
+
+
+def test_marker_jitter_in_a_still_scene_reads_no_motion(tmp_path):
+    # A still scene whose marker (and its anchored bench) is drawn 2 px over every
+    # other frame: the corners jitter but nothing on the bench moved. Comparing the
+    # zone crop cut under each frame's own corners keeps the content registered, so
+    # the jitter cannot read as motion (a fixed-coordinate frame diff would).
+    from station_watch.detect.geometry import find_marker_corners
+
+    config = _config()
+    base = utc_now_iso()
+    fid = config.fiducial
+    tracker = MotionTracker(config, run_id="run-test")
+    observations = []
+    for frame_id in range(8):
+        marker_x = 30 + (2 if frame_id % 2 else 0)  # jitter the drawn marker by 2 px
+        path, _truth = write_synth_station_clip(
+            tmp_path / f"frame-{frame_id}",
+            [{}],
+            rail_positions=RAIL,
+            keepout_rois=KEEPOUT,
+            station_zone=STATION_ZONE,
+            marker_xy=(marker_x, 30),
+            noise_sigma=0.0,  # isolate the jitter: the only change is the 2 px shift
+        )
+        frame = _read_frames(path)[0]
+        corners = find_marker_corners(frame, fid["dictionary_id"], fid["marker_id"])
+        ts = offset_iso(base, frame_id * 0.1)
+        observations.extend(tracker.update(frame, frame_id, ts, corners))
+
+    kinds = {o.kind for o in observations}
+    assert ObservationKind.MOTION not in kinds, "marker jitter must never read as motion"
+    assert ObservationKind.NO_MOTION in kinds, "a still jittering scene still reads no_motion"
+
+
 # --- a moving tool in the zone reads motion ----------------------------------
 
 

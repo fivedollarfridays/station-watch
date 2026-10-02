@@ -5,14 +5,22 @@
   write.
 * The loopback HTTP server rejects a request whose ``Host`` is not
   ``127.0.0.1:<port>`` or ``localhost:<port>`` (DNS-rebinding defence).
+
+HF3.2 extends the server hardening: every response carries ``nosniff`` and
+``no-store``; a foreign ``Origin`` is refused by the code; the server threads so
+one stalled connection cannot starve the page; and rejections -- not successful
+GETs -- write one stderr line each.
 """
 
 from __future__ import annotations
 
 import http.client
+import socket
 import sqlite3
 import sys
 import threading
+import time
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -117,3 +125,110 @@ def test_a_missing_host_header_is_rejected_403(tmp_path):
         status, body = _get(port, None)
         assert status == 403
         assert b"station-1" not in body
+
+
+def _request(
+    port: int,
+    *,
+    method: str = "GET",
+    path: str = "/view.json",
+    host: str | None = None,
+    origin: str | None = None,
+):
+    """A raw request letting a test set Host/Origin independently of the client."""
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        conn.putrequest(method, path, skip_host=True)
+        conn.putheader("Host", host if host is not None else f"127.0.0.1:{port}")
+        if origin is not None:
+            conn.putheader("Origin", origin)
+        conn.endheaders()
+        resp = conn.getresponse()
+        return resp.status, dict(resp.getheaders()), resp.read()
+    finally:
+        conn.close()
+
+
+# --- AC2: every response carries nosniff and no-store ---------------------------
+
+
+def test_every_response_carries_the_security_headers(tmp_path):
+    log_path = _log_at(tmp_path / "log.db")
+    with _Served(log_path) as port:
+        cases = [
+            dict(path="/view.json"),  # 200
+            dict(host="evil.example"),  # 403 (bad host)
+            dict(origin="http://evil.example"),  # 403 (bad origin)
+            dict(path="/nope"),  # 404
+            dict(method="POST", path="/"),  # 405
+        ]
+        for case in cases:
+            status, headers, _ = _request(port, **case)
+            assert headers.get("X-Content-Type-Options") == "nosniff", (case, status)
+            assert headers.get("Cache-Control") == "no-store", (case, status)
+
+
+# --- AC3: a foreign Origin is refused by the code -------------------------------
+
+
+def test_a_foreign_origin_is_rejected_403(tmp_path):
+    log_path = _log_at(tmp_path / "log.db")
+    with _Served(log_path) as port:
+        status, _, body = _request(port, origin="http://evil.example")
+        assert status == 403
+        assert b"station-1" not in body
+
+
+def test_the_boards_own_origin_or_no_origin_is_served(tmp_path):
+    log_path = _log_at(tmp_path / "log.db")
+    with _Served(log_path) as port:
+        for origin in (None, f"http://127.0.0.1:{port}", f"http://localhost:{port}"):
+            status, _, body = _request(port, origin=origin)
+            assert status == 200, origin
+            assert b"station-1" in body, origin
+
+
+# --- AC4: a stalled connection does not starve a second client ------------------
+
+
+def test_the_server_is_a_threading_server(tmp_path):
+    log_path = _log_at(tmp_path / "log.db")
+    server = make_server(health_config(), log_path, port=0, clock=lambda: EPOCH)
+    try:
+        assert isinstance(server, ThreadingHTTPServer)
+        assert server.daemon_threads is True
+    finally:
+        server.server_close()
+
+
+def test_a_silent_client_does_not_block_a_second_clients_get(tmp_path):
+    log_path = _log_at(tmp_path / "log.db")
+    with _Served(log_path) as port:
+        stalled = socket.create_connection(("127.0.0.1", port), timeout=5)
+        try:
+            # The stalled client sends nothing. A second client's GET must return.
+            start = time.monotonic()
+            status, body = _get(port, f"127.0.0.1:{port}")
+            elapsed = time.monotonic() - start
+            assert status == 200
+            assert elapsed < 2.0, f"second GET blocked for {elapsed:.2f}s behind a silent client"
+        finally:
+            stalled.close()
+
+
+# --- AC5: rejections write one stderr line each; a 200 GET writes none ----------
+
+
+def test_rejections_log_one_line_each_and_a_get_stays_quiet(tmp_path, capfd):
+    log_path = _log_at(tmp_path / "log.db")
+    with _Served(log_path) as port:
+        assert _request(port, host="evil.example", path="/bad-host-probe")[0] == 403
+        assert _request(port, method="POST", path="/")[0] == 405
+        assert _request(port, path="/view.json")[0] == 200  # the quiet, successful GET
+    err_lines = [line for line in capfd.readouterr().err.splitlines() if line.strip()]
+    assert len(err_lines) == 2, err_lines
+    joined = "\n".join(err_lines)
+    assert "403" in joined and "405" in joined
+    assert "POST" in joined  # the method is named
+    assert "/bad-host-probe" in joined  # the path is named
+    assert "/view.json" not in joined  # the successful GET writes no line

@@ -10,6 +10,8 @@ the run actually wrote, through the installed console script.
 from __future__ import annotations
 
 import re
+import shutil
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -64,6 +66,30 @@ def _cli(*args, timeout=90):
     )
 
 
+def _index_names(path: Path) -> set[str]:
+    conn = sqlite3.connect(str(path))
+    try:
+        return {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")}
+    finally:
+        conn.close()
+
+
+def _copy_with_undecodable_row(logdb: Path, dest: Path, bad_id: str) -> Path:
+    """A copy of ``logdb`` with one undecodable ``verdict`` row appended newest."""
+    shutil.copy2(logdb, dest)
+    conn = sqlite3.connect(str(dest))
+    try:
+        newest_ts = conn.execute("SELECT MAX(ts) FROM records").fetchone()[0]
+        conn.execute(
+            "INSERT INTO records (record_id, kind, ts, run_id, body) VALUES (?, ?, ?, ?, ?)",
+            (bad_id, "verdict", newest_ts + "9", "run-corrupt", '{"record_id": "' + bad_id + '"}'),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return dest
+
+
 def test_run_then_board_once_shows_dark_episode_and_frame_age(tmp_path):
     clip = write_synth_clip(tmp_path / "clip", frames=200, fps=50.0, dark_from=100)
     config = tmp_path / "station.yaml"
@@ -97,3 +123,15 @@ def test_run_then_board_once_shows_dark_episode_and_frame_age(tmp_path):
     assert "unobservable:dark" in out, f"the board should show the open episode:\n{out}"
     assert re.search(r"\d+\.\d+s old", out), f"the board should show a frame age:\n{out}"
     assert "OK" not in out.replace("NOT OK", ""), f"a dark station is never OK:\n{out}"
+
+    # The real run's Log carries the blind-reason expression index.
+    assert "records_blind_reason" in _index_names(logdb)
+
+    # A copy of that Log with one undecodable row appended renders UNKNOWN, naming
+    # the record, through the real board --once path -- it never crashes.
+    bad_id = "run-corrupt:verdict:999"
+    corrupt = _copy_with_undecodable_row(logdb, tmp_path / "log-corrupt.db", bad_id)
+    board2 = _cli("board", "--config", str(config), "--log", str(corrupt), "--once")
+    assert board2.returncode == 0, board2.stderr
+    assert "UNKNOWN" in board2.stdout, board2.stdout
+    assert bad_id in board2.stdout, board2.stdout

@@ -141,6 +141,35 @@ def test_process_finds_the_marker_once_and_shares_corners_with_every_tracker(tmp
     assert len(out) == 2, "each tracker's observations are concatenated"
 
 
+def test_process_with_given_corners_does_not_search_again(tmp_path, monkeypatch):
+    import station_watch.detect.detector as detector_mod
+    from station_watch.detect.geometry import find_marker_corners, marker_center
+
+    calls = {"n": 0}
+
+    def counting(*args, **kwargs):
+        calls["n"] += 1
+        return find_marker_corners(*args, **kwargs)
+
+    monkeypatch.setattr(detector_mod, "find_marker_corners", counting)
+
+    config = _config()
+    frame = _one_synth_frame(tmp_path, {"positions": {"rail_pos_1": "present"}})
+    corners = find_marker_corners(frame, config.fiducial["dictionary_id"], config.fiducial["marker_id"])
+    assert corners is not None
+
+    detector = Detector(config, run_id="r")
+    given = detector.process(frame, 0, EPOCH, corners=corners)
+    assert calls["n"] == 0, "corners supplied -> the Detector must not search for the marker"
+    assert marker_center(corners) is not None  # the center helper derives from corners
+
+    detector_again = Detector(config, run_id="r")
+    found = detector_again.process(frame, 1, EPOCH)
+    assert calls["n"] == 1, "called without corners -> the Detector finds them itself"
+    # Same frame, same reading whether corners were supplied or found.
+    assert {o.target for o in given} == {o.target for o in found}
+
+
 def _unknown_obs(frame_id, ts, target, cause) -> Observation:
     return Observation(
         station_id="station-1",
@@ -204,10 +233,10 @@ class _FlakyDetector:
         self._inner = inner
         self._raise_on = raise_on
 
-    def process(self, frame, frame_id, ts):
+    def process(self, frame, frame_id, ts, corners=None):
         if frame_id == self._raise_on:
             raise RuntimeError("synthetic detect failure")
-        return self._inner.process(frame, frame_id, ts)
+        return self._inner.process(frame, frame_id, ts, corners)
 
     def unknown_all(self, frame_id, ts, cause, detail):
         return self._inner.unknown_all(frame_id, ts, cause, detail)

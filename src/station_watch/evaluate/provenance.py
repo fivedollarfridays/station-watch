@@ -55,9 +55,19 @@ def build_provenance(
     detector: str,
     clips: int,
     sessions: list[str],
+    split: str | None = None,
+    clip_sha256s: list[str] | None = None,
+    recorded_on: dict | None = None,
+    calibration: object | None = None,
 ) -> dict:
-    """Assemble the provenance block for a measurement file (one detector's numbers)."""
-    return {
+    """Assemble the provenance block for a measurement file (one detector's numbers).
+
+    The HF3.8 split fields (``split``, ``clip_sha256s``, ``recorded_on`` and, for a
+    held-out run, ``calibration``) are added only when supplied, so callers that do
+    not track a split -- the fault drill and the physics scripts -- write exactly the
+    block they always have.
+    """
+    provenance = {
         "dataset": dataset,
         "dataset_kind": dataset_kind,
         "manifest_sha256": manifest_sha256,
@@ -68,6 +78,15 @@ def build_provenance(
         "sessions": list(sessions),
         "date_utc": datetime.now(UTC).date().isoformat(),
     }
+    if split is not None:
+        provenance["split"] = split
+    if clip_sha256s is not None:
+        provenance["clip_sha256s"] = sorted(clip_sha256s)
+    if recorded_on is not None:
+        provenance["recorded_on"] = dict(recorded_on)
+    if calibration is not None:
+        provenance["calibration"] = calibration
+    return provenance
 
 
 __all__ = [

@@ -58,7 +58,9 @@ CREATE TABLE IF NOT EXISTS records (
     body      TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS records_kind_ts ON records (kind, ts);
-CREATE INDEX IF NOT EXISTS records_kind_run_ts ON records (kind, run_id, ts)
+CREATE INDEX IF NOT EXISTS records_kind_run_ts ON records (kind, run_id, ts);
+CREATE INDEX IF NOT EXISTS records_blind_reason
+    ON records (kind, json_extract(body, '$.reason'), ts)
 """
 
 
