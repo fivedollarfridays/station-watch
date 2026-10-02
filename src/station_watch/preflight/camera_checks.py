@@ -1,4 +1,4 @@
-"""The camera-facing preflight checks: ``camera``, ``frames_live``, ``fiducial``.
+"""The camera-facing preflight checks: camera, frames_live, fiducial, camera_stability.
 
 ``camera`` opens the configured source (naming it on failure, K9); ``frames_live``
 reads several frames within ``liveness_window_s`` and insists they have distinct
@@ -7,6 +7,8 @@ identical bytes); ``fiducial`` finds the marker once per sampled frame through
 HF3.1's corners and measures its center against ``expected_center_px``. The two
 later checks never open the camera themselves -- if ``camera`` failed they report
 that reason, so a camera-dependent check never passes on a camera that never opened.
+``camera_stability`` (HF3.13) samples the fiducial center for ``drift_s`` seconds and
+WARNs on drift past half ``tolerance_px``; ``camera.gimbal: true`` is always a WARN.
 """
 
 from __future__ import annotations
@@ -137,39 +139,52 @@ def _max_drift(centers: list) -> float:
     )
 
 
-def check_camera_stability(ctx: PreflightContext) -> CheckResult:
-    """A gimbal always WARNs; otherwise the fiducial center must not drift past half tolerance."""
-    gimbal = bool((ctx.raw_config or {}).get("camera", {}).get("gimbal", False))
-    if gimbal:
-        return CheckResult("camera_stability", WARN, _GIMBAL_WARNING)
-    if ctx.station_config is None:
-        return CheckResult("camera_stability", FAIL, "config did not load")
-    if ctx.camera_error is not None:
-        return CheckResult("camera_stability", FAIL, f"camera did not open: {ctx.camera_error}")
+def _measure_drift(ctx: PreflightContext) -> tuple[float | None, float, str]:
+    """Sample the fiducial for ``drift_s``: ``(drift or None, limit, describing text)``."""
     fid = ctx.station_config.fiducial
-    dictionary_id, marker_id = fid["dictionary_id"], int(fid["marker_id"])
     tolerance = float(fid["tolerance_px"])
     limit = tolerance / 2.0
-    centers = _sample_marker_centers(ctx.frame_source, ctx.drift_s, dictionary_id, marker_id)
+    centers = _sample_marker_centers(
+        ctx.frame_source, ctx.drift_s, fid["dictionary_id"], int(fid["marker_id"])
+    )
     if len(centers) < 2:
-        return CheckResult(
-            "camera_stability",
-            WARN,
-            f"only {len(centers)} frame(s) with the marker in {ctx.drift_s}s; cannot measure drift",
+        return None, limit, (
+            f"only {len(centers)} frame(s) with the marker in {ctx.drift_s}s; "
+            "cannot measure drift"
         )
     drift = _max_drift(centers)
     if drift > limit:
-        return CheckResult(
-            "camera_stability",
-            WARN,
+        return drift, limit, (
             f"fiducial center drifted {drift:.1f}px over {ctx.drift_s}s "
-            f"(limit {limit:.1f}px = half tolerance {tolerance}px)",
+            f"(limit {limit:.1f}px = half tolerance {tolerance}px)"
         )
-    return CheckResult(
-        "camera_stability",
-        PASS,
-        f"fiducial center steady within {drift:.1f}px over {ctx.drift_s}s (limit {limit:.1f}px)",
+    return drift, limit, (
+        f"fiducial center steady within {drift:.1f}px over {ctx.drift_s}s (limit {limit:.1f}px)"
     )
+
+
+def check_camera_stability(ctx: PreflightContext) -> CheckResult:
+    """A gimbal always WARNs; any camera WARNs when the fiducial drifts past half tolerance.
+
+    The drift is sampled for every camera, gimbal or not, so a gimbal WARN also carries
+    the measured drift beside the standing lock-it reminder.
+    """
+    gimbal = bool(((ctx.raw_config or {}).get("camera") or {}).get("gimbal", False))
+    if ctx.station_config is None or ctx.camera_error is not None:
+        # Could not check: a FAIL naming why (K10), never softened to a WARN by the
+        # gimbal reminder, which rides along in the detail.
+        if ctx.station_config is None:
+            reason = "config did not load"
+        else:
+            reason = f"camera did not open: {ctx.camera_error}"
+        detail = f"{reason}; {_GIMBAL_WARNING}" if gimbal else reason
+        return CheckResult("camera_stability", FAIL, detail)
+    drift, limit, text = _measure_drift(ctx)
+    if gimbal:
+        return CheckResult("camera_stability", WARN, f"{_GIMBAL_WARNING}; {text}")
+    if drift is None or drift > limit:
+        return CheckResult("camera_stability", WARN, text)
+    return CheckResult("camera_stability", PASS, text)
 
 
 __all__ = ["check_camera", "check_frames_live", "check_fiducial", "check_camera_stability"]

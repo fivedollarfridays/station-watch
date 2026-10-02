@@ -17,6 +17,16 @@ class CaptureError(Exception):
     """Raised when a capture source cannot be opened."""
 
 
+def _open_failure(source: int | str) -> str:
+    """Name what would not open: a device index (no such camera) or a file path."""
+    if isinstance(source, int):
+        return (
+            f"could not open camera device index {source} (no such device, or it is in "
+            "use; find the right index with `station-watch preflight --list-cameras`)"
+        )
+    return f"could not open capture source: {source!r}"
+
+
 class FrameSource:
     """A readable stream of BGR frames from a camera index or a file path."""
 
@@ -25,7 +35,7 @@ class FrameSource:
         self._is_file = isinstance(source, str)
         self._cap = cv2.VideoCapture(source)
         if not self._cap.isOpened():
-            raise CaptureError(f"could not open capture source: {source!r}")
+            raise CaptureError(_open_failure(source))
 
     @property
     def is_file(self) -> bool:

@@ -170,11 +170,25 @@ DOC = ROOT / "docs" / "CAMERAS.md"
 
 
 def _station_watch_commands(text: str) -> list[str]:
-    return [
-        line.strip()
-        for line in text.splitlines()
-        if line.strip().startswith("station-watch ")
+    """Every ``station-watch ...`` command: whole lines in fenced blocks and inline spans."""
+    fenced = [ln.strip() for ln in text.splitlines() if ln.strip().startswith("station-watch ")]
+    inline = re.findall(r"`(station-watch [^`]+)`", text)
+    return fenced + inline
+
+
+def test_doc_command_extraction_includes_inline_spans():
+    text = "run `station-watch preflight --list-cameras` first\n```\nstation-watch qa\n```"
+    assert _station_watch_commands(text) == [
+        "station-watch qa",
+        "station-watch preflight --list-cameras",
     ]
+
+
+def test_pocket3_uvc_claim_is_marked_unverified():
+    # The Pocket 3 working as a plain UVC webcam is a device claim not yet checked
+    # on the hardware, so the sentence making it carries the "unverified" mark.
+    claim = next(ln for ln in DOC.read_text().splitlines() if "plain UVC webcam" in ln)
+    assert "unverified" in claim.lower(), claim
 
 
 def test_cameras_doc_exists():

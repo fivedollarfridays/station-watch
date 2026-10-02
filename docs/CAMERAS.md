@@ -25,7 +25,8 @@ machine are empty. Widen the search with `--max-index`:
 station-watch preflight --list-cameras --max-index 8
 ```
 
-Pick the index whose reported resolution and "frame: read" match your camera, then use
+Pick the index whose reported resolution matches your camera and whose frame column
+says `read`, then use
 it as `--source`:
 
 ```
@@ -66,7 +67,7 @@ WARNs, the mount is moving — re-seat it.
 
 ## The DJI Pocket 3 as a USB webcam
 
-The DJI Pocket 3 can act as a plain UVC webcam over USB-C, which lets `station-watch`
+The DJI Pocket 3 can act as a plain UVC webcam over USB-C (unverified on our hardware), which lets `station-watch`
 use it through the same `--source <index>` path as any other webcam. The catch is the
 **gimbal**: the Pocket 3 actively stabilizes, which means the framing can drift slowly
 even on a static mount, and that drift raises `view_shifted`. For a fixed station camera
@@ -81,7 +82,8 @@ camera:
 
 With `camera.gimbal: true`, the `camera_stability` check always reports **WARN** —
 "a gimbal can drift and raise view_shifted; lock it before going live" — as a standing
-reminder to lock it before a production run.
+reminder to lock it before a production run. It still samples the fiducial for
+`--drift-s` seconds, so the WARN line also carries the measured drift.
 
 The exact on-device menu names for webcam mode and gimbal lock are **not yet confirmed
 on the hardware**, so the device-level steps below are marked `unverified`. Do not
@@ -99,8 +101,12 @@ documentation before relying on it.
 
 - **`--list-cameras` shows nothing.** No index in the range opened. Widen `--max-index`,
   check the cable and port, and make sure no other application holds the camera.
-- **An index opens but `frame: no frame`.** The device enumerated but did not deliver a
+- **An index opens but its frame column says `no frame`.** The device enumerated but did not deliver a
   frame — often a camera still held by another process, or a mode it has not started.
 - **`camera_stability` WARNs on a fixed webcam.** The mount is moving; re-seat it. On a
   Pocket 3, lock the gimbal and expect the standing gimbal WARN when `camera.gimbal` is
   true.
+- **On macOS, `--list-cameras` shows nothing and OpenCV prints "not authorized to capture
+  video".** The terminal app running `station-watch` has not been granted camera access.
+  Grant it under System Settings, Privacy & Security, Camera, then restart the terminal
+  and run `station-watch preflight --list-cameras` again.

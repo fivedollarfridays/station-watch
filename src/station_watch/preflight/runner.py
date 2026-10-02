@@ -39,14 +39,22 @@ CHECKS: dict = {
 _CHECK_TIMEOUT_S = 20.0
 
 
+def _timeout_for(name: str, ctx: PreflightContext) -> float:
+    """The base timeout, plus the sampling window for the check that samples for ``drift_s``."""
+    if name == "camera_stability":
+        return _CHECK_TIMEOUT_S + float(ctx.drift_s)
+    return _CHECK_TIMEOUT_S
+
+
 def _run_one(name: str, check, ctx: PreflightContext) -> CheckResult:
     """Run one check under the timeout; a timeout or any exception is a FAIL (K10)."""
+    timeout = _timeout_for(name, ctx)
     pool = ThreadPoolExecutor(max_workers=1)
     future = pool.submit(check, ctx)
     try:
-        return future.result(timeout=_CHECK_TIMEOUT_S)
+        return future.result(timeout=timeout)
     except FutureTimeout:
-        return CheckResult(name, FAIL, f"timed out after {_CHECK_TIMEOUT_S}s")
+        return CheckResult(name, FAIL, f"timed out after {timeout}s")
     except Exception as exc:  # K10: a raising check is a FAIL that names the reason
         return CheckResult(name, FAIL, f"{type(exc).__name__}: {exc}")
     finally:

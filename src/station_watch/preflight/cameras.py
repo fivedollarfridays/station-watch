@@ -33,8 +33,14 @@ class CameraReport:
     frame_read: bool
 
 
-def probe_cameras(max_index: int, *, source_factory=FrameSource) -> list[CameraReport]:
-    """Try indexes ``0..max_index``; report each that opens, skip each that does not."""
+def probe_cameras(max_index: int, *, source_factory=None) -> list[CameraReport]:
+    """Try indexes ``0..max_index``; report each that opens, skip each that does not.
+
+    ``source_factory`` defaults to :class:`FrameSource`, looked up at call time so a
+    test can swap the module's factory for a fake.
+    """
+    if source_factory is None:
+        source_factory = FrameSource
     reports: list[CameraReport] = []
     for index in range(max_index + 1):
         try:

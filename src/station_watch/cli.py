@@ -13,7 +13,12 @@ import sys
 
 from station_watch.run import new_run_id
 from station_watch.runner.pipeline import Runner
-from station_watch.runner.startup import StartupError, build_context
+from station_watch.runner.startup import (
+    DEFAULT_EVIDENCE_DIR,
+    StartupError,
+    build_context,
+    default_evidence_dir,
+)
 from station_watch.watchdog import build_watchdog
 
 
@@ -25,21 +30,37 @@ def build_parser() -> argparse.ArgumentParser:
     _add_run_parser(sub)
     _add_watchdog_parser(sub)
     _add_fetch_model_parser(sub)
-    # The evaluate/board/drill/measure/qa subcommands keep their arg wiring beside their
-    # own logic, imported here so the parser knows them but the heavy work (OpenCV,
-    # renderers, the Log walk) stays deferred to each module's `handle`.
-    from station_watch.board.commandline import add_parser as add_board_parser
-    from station_watch.drill.commandline import add_parser as add_drill_parser
-    from station_watch.evaluate.commandline import add_parser as add_evaluate_parser
-    from station_watch.physics.commandline import add_parser as add_measure_parser
-    from station_watch.qa import add_parser as add_qa_parser
-
-    add_evaluate_parser(sub)
-    add_board_parser(sub)
-    add_drill_parser(sub)
-    add_measure_parser(sub)
-    add_qa_parser(sub)
+    for module in _lazy_commands().values():
+        module.add_parser(sub)
     return parser
+
+
+def _lazy_commands() -> dict:
+    """The evaluate/board/drill/measure/qa/audit subcommand modules, each imported once.
+
+    Their arg wiring lives beside their own logic; importing the (argparse-only)
+    modules here lets the parser know them while the heavy work (OpenCV, renderers,
+    the Log walk) stays deferred to each module's ``handle``.
+    """
+    import station_watch.audit.commandline as audit
+    import station_watch.board.commandline as board
+    import station_watch.drill.commandline as drill
+    import station_watch.evaluate.commandline as evaluate
+    import station_watch.physics.commandline as measure
+    import station_watch.preflight.commandline as preflight
+    import station_watch.qa as qa
+    import station_watch.soak.commandline as soak
+
+    return {
+        "evaluate": evaluate,
+        "board": board,
+        "drill": drill,
+        "measure": measure,
+        "qa": qa,
+        "audit": audit,
+        "soak": soak,
+        "preflight": preflight,
+    }
 
 
 def _add_run_parser(sub) -> None:
@@ -86,11 +107,17 @@ def _add_run_parser(sub) -> None:
         type=int,
         help="stop after this many cycles (bounds a live-device or drill run)",
     )
+    _add_evidence_args(run)
+
+
+def _add_evidence_args(run) -> None:
+    """Where to keep evidence thumbnails of citable frames (HF3.4), or to skip them."""
     run.add_argument(
         "--evidence-dir",
-        default="data/local/evidence",
-        help="where to keep evidence thumbnails of citable frames "
-        "(default: data/local/evidence, under the gitignored local data dir)",
+        default=default_evidence_dir(),
+        help="where to keep evidence thumbnails of citable frames (default: "
+        "data/local/evidence, or $STATION_WATCH_EVIDENCE_DIR; under the gitignored "
+        "local data dir)",
     )
     run.add_argument(
         "--no-evidence",
@@ -215,23 +242,11 @@ def main(argv: list[str] | None = None) -> int:
         return _fetch_model(args)
     # The lazy subcommands dispatch to their sibling `commandline.handle`; the modules
     # were already imported when `build_parser` wired their args, so this is free.
-    from station_watch.board.commandline import handle as board_handle
-    from station_watch.drill.commandline import handle as drill_handle
-    from station_watch.evaluate.commandline import handle as evaluate_handle
-    from station_watch.physics.commandline import handle as measure_handle
-    from station_watch.qa import handle as qa_handle
-
-    handlers = {
-        "evaluate": evaluate_handle,
-        "board": board_handle,
-        "drill": drill_handle,
-        "measure": measure_handle,
-        "qa": qa_handle,
-    }
-    if args.command in handlers:
-        return handlers[args.command](args)
+    commands = _lazy_commands()
+    if args.command in commands:
+        return commands[args.command].handle(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 
 
-__all__ = ["main", "build_parser"]
+__all__ = ["main", "build_parser", "DEFAULT_EVIDENCE_DIR"]
