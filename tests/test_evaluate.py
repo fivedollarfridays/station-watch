@@ -53,11 +53,13 @@ def _provenance(path):
 def test_synthetic_detect_numbers_are_exact(synth):
     m = _metrics(synth / "detect.json")
     # One clip per flag type is a true positive; the rest are true negatives.
+    # One clip has the missing part; the other six (incl. the two detail clips, whose
+    # components stay present) are true negatives for the component-level flag.
     assert m["missing_part"] == {
         "tp": 1,
         "fp": 0,
         "fn": 0,
-        "tn": 4,
+        "tn": 6,
         "precision": 1.0,
         "recall": 1.0,
     }
@@ -65,9 +67,11 @@ def test_synthetic_detect_numbers_are_exact(synth):
     assert m["keepout_entry"]["precision"] == 1.0 and m["keepout_entry"]["recall"] == 1.0
     # cycle_time_creep has no instance in the proving set -> honestly undefined.
     assert m["cycle_time_creep"]["precision"] is None
-    # rail-position state confusion: 9 present + 1 absent read right, 2 unknown read as unknown.
+    # rail-position state confusion, now including the scored detail targets (HF3.16):
+    # 9 rail-present + 8 detail-present read present; 1 rail-absent + 2 detail-absent read
+    # absent; 2 unknown read unknown. Every detail read lands on the diagonal.
     conf = m["confusion_matrix"]
-    assert conf["present"]["present"] == 9 and conf["absent"]["absent"] == 1
+    assert conf["present"]["present"] == 17 and conf["absent"]["absent"] == 3
     assert conf["unknown"]["unknown"] == 2
     assert m["rail_position_states"]["present"]["recall"] == 1.0
     # latency is real and ordered; one injected fault has a measured time to alarm.
@@ -102,7 +106,7 @@ def test_every_measurement_file_carries_provenance(synth):
             "date_utc",
         }
         assert prov["dataset_kind"] == "synthetic"
-        assert prov["clips"] == 5 and prov["sessions"] == ["s1", "s2"]
+        assert prov["clips"] == 7 and prov["sessions"] == ["s1", "s2"]
         assert len(prov["manifest_sha256"]) == 64 and len(prov["config_sha256"]) == 64
 
 
@@ -113,7 +117,7 @@ def test_baseline_written_beside_and_beaten_by_the_detector(synth):
     detect = _metrics(synth / "detect.json")
     baseline = _metrics(synth / "baseline.json")
     assert _provenance(synth / "baseline.json")["detector"].startswith("frame_diff")
-    assert _provenance(synth / "baseline.json")["clips"] == 5  # same clip set
+    assert _provenance(synth / "baseline.json")["clips"] == 7  # same clip set
     # The naive whole-frame baseline is blind to a missing part and a keep-out entry,
     # so the real detector's recall is at least as good on every flag type.
     for flag in ("missing_part", "stalled", "keepout_entry"):
@@ -220,7 +224,9 @@ def _run_config(path, step_times_path):
 
 def test_evaluate_subprocess_writes_step_times_the_run_subprocess_reads(tmp_path):
     eval_out = tmp_path / "measurements"
-    result = _run_cli("evaluate", "--synthetic", "--out", str(eval_out))
+    # --out is outside the synthetic tree (a pytest temp dir), so --force-out is
+    # required now that every evaluate --out is confined (HF3.9).
+    result = _run_cli("evaluate", "--synthetic", "--out", str(eval_out), "--force-out")
     assert result.returncode == 0, result.stderr
     step_times = eval_out / "step_times.json"
     assert step_times.exists(), "the evaluate run must write step_times.json (HF2.4's file)"
@@ -250,3 +256,42 @@ def test_evaluate_subprocess_writes_step_times_the_run_subprocess_reads(tmp_path
     )
     assert run.returncode == 0, run.stderr
     assert "measured step times" in run.stdout, run.stdout
+
+
+# --- HF3.16: a real evaluate --synthetic subprocess scores the detail targets --------
+
+
+def test_synthetic_subprocess_scores_detail_targets_in_the_confusion_matrix(tmp_path):
+    # A real `station-watch evaluate --synthetic` subprocess regenerates detect.json; the
+    # two detail clips' label/ferrule/torque_stripe reads land in the rail confusion
+    # matrix. Without detail scoring the matrix would hold 9 present + 1 absent (rail
+    # positions only); the detail targets raise it to 17 present + 3 absent, all on the
+    # diagonal -- every scored detail read is correct.
+    eval_out = tmp_path / "measurements"
+    result = _run_cli("evaluate", "--synthetic", "--out", str(eval_out), "--force-out")
+    assert result.returncode == 0, result.stderr
+    m = _metrics(eval_out / "detect.json")
+    conf = m["confusion_matrix"]
+    assert conf["present"]["present"] == 17, conf
+    assert conf["absent"]["absent"] == 3, conf
+    # Every read is correct: no detail (or rail) interval is misread or missed.
+    off_diagonal = sum(
+        conf[gt][pred] for gt in ("present", "absent", "unknown") for pred in conf[gt] if pred != gt
+    )
+    assert off_diagonal == 0, conf
+    assert _provenance(eval_out / "detect.json")["clips"] == 7
+
+
+# --- the step-time baseline is a real measurement, not a degenerate 0.0 s ----------
+
+
+def test_synthetic_step_times_measures_closed_steps(synth):
+    data = json.loads((synth / "step_times.json").read_text())
+    assert data["metrics"]["count"] > 0, data
+    assert data["metrics"]["p95_s"] > 0.0
+
+
+def test_committed_synthetic_step_times_is_not_degenerate():
+    committed = Path(__file__).resolve().parents[1] / "measurements/synthetic/step_times.json"
+    metrics = json.loads(committed.read_text())["metrics"]
+    assert metrics["count"] > 0 and metrics["p95_s"] > 0.0, metrics

@@ -71,6 +71,13 @@ class ClipLabel:
     ``fps``, ``exposure_s``, ``speed_m_s``, ``lamp``, ``angle_deg``). It is how a
     physics measurement selects the clips it consumes without touching the HF2
     scoring intervals; an HF2 manifest with no ``tags`` loads exactly as before.
+
+    ``split`` (``calibration`` / ``held_out``), ``recorded_on`` (``YYYY-MM-DD``) and
+    ``clip_sha256`` carry the HF3.8 train/test separation: a session's ``split`` and
+    ``recorded_on`` propagate to each of its clips (absent ``split`` means
+    ``calibration``, so every HF2 manifest loads unchanged), and ``clip_sha256`` is
+    the SHA-256 of the clip's bytes, computed at load -- the identity the held-out
+    calibration check traces against.
     """
 
     session: str
@@ -83,6 +90,9 @@ class ClipLabel:
     creeps: list[dict] = field(default_factory=list)
     occlusions: list[dict] = field(default_factory=list)
     tags: dict = field(default_factory=dict)
+    split: str = "calibration"
+    recorded_on: str | None = None
+    clip_sha256: str = ""
 
 
 @dataclass(frozen=True)
@@ -125,7 +135,12 @@ def _contained_clip_path(rel: str, clips_dir: Path, session: str) -> Path:
     return Path(candidate)
 
 
-def _clip_label(session: str, entry: dict, clips_dir: Path) -> ClipLabel:
+SPLITS = ("calibration", "held_out")
+
+
+def _clip_label(
+    session: str, entry: dict, clips_dir: Path, *, split: str, recorded_on
+) -> ClipLabel:
     rel = entry["path"]
     clip_path = _contained_clip_path(rel, clips_dir, session)
     if not clip_path.exists():
@@ -141,7 +156,20 @@ def _clip_label(session: str, entry: dict, clips_dir: Path) -> ClipLabel:
         creeps=list(entry.get("creeps", [])),
         occlusions=list(entry.get("occlusions", [])),
         tags=dict(entry.get("tags", {})),
+        split=split,
+        recorded_on=recorded_on,
+        clip_sha256=sha256_file(clip_path),
     )
+
+
+def _session_split(session: dict) -> str:
+    split = session.get("split", "calibration")
+    if split not in SPLITS:
+        raise ManifestError(
+            f"manifest session {session.get('id')!r} has unknown split {split!r} "
+            f"(expected one of {', '.join(SPLITS)})"
+        )
+    return split
 
 
 def load_manifest(manifest_path: str | None, clips_dir: str | Path) -> Manifest:
@@ -159,8 +187,12 @@ def load_manifest(manifest_path: str | None, clips_dir: str | Path) -> Manifest:
     clips: list[ClipLabel] = []
     for session in data.get("sessions", []):
         session_id = session["id"]
+        split = _session_split(session)
+        recorded_on = session.get("recorded_on")
         for entry in session.get("clips", []):
-            clips.append(_clip_label(session_id, entry, clips_dir))
+            clips.append(
+                _clip_label(session_id, entry, clips_dir, split=split, recorded_on=recorded_on)
+            )
     if not clips:
         raise ManifestError(f"manifest lists no clips: {manifest_path}")
     return Manifest(

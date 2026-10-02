@@ -1,0 +1,33 @@
+{
+  "metrics": {
+    "board_render_failures": 0,
+    "board_render_p95_s": 0.02552029094658792,
+    "duration_s": 600.0,
+    "failures": [],
+    "false_flags": 0,
+    "log_growth_mb_per_h": 16.468369611374676,
+    "max_verdict_gap_s": 20.25348945899168,
+    "post_warmup_samples": 26,
+    "qa_observable_s": 597.0657050609589,
+    "qa_status": "pass",
+    "qa_unobservable_fraction": 0.0016788124021338857,
+    "rss_growth_mb_per_h": {
+      "board": 6.782978049598214,
+      "run": 51.170587763310664,
+      "watchdog": 1.3163901135216263
+    },
+    "status": "pass",
+    "verdicts_per_minute": 59.394153843296365
+  },
+  "provenance": {
+    "clips": 0,
+    "config_sha256": "de6ff611e008b1d8e0e57c8c2ae0f1f0faed9c578d04d7ef49ea4cabdf91ede8",
+    "dataset": "station-1",
+    "dataset_kind": "synthetic",
+    "date_utc": "2026-10-02",
+    "detector": "station_watch.detect:real-pipeline:v1",
+    "git_commit": "657aaa45cc3d12b8feaf89d57b280c2da80e22bd",
+    "manifest_sha256": "none",
+    "sessions": []
+  }
+}

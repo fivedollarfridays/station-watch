@@ -32,6 +32,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from station_watch.detect.details import DEFAULT_DETAIL_REGIONS
 from station_watch.detect.geometry import region_to_pixels
 from station_watch.synth.video import _marker_tile, _write_frames
 
@@ -49,6 +50,15 @@ _KEEPOUT_ROIS = {
 }
 _COMPONENT_COLORS = {"rail_pos_1": (200, 120, 60), "rail_pos_2": (60, 180, 90)}
 _DEFAULT_COLOR = (170, 170, 170)
+# Colours drawn for each detail kind (BGR): torque_stripe is a vivid yellow whose hue
+# (~30) sits in the reader's default hue_range; label is a near-white band; ferrule is a
+# desaturated silver sleeve (its crimp ridges, drawn below, give it edge density).
+_DETAIL_COLORS = {
+    "torque_stripe": (0, 255, 255),
+    "label": (236, 236, 236),
+    "ferrule": (200, 200, 200),
+}
+_FERRULE_RIDGE = (120, 120, 120)
 _SKIN = (120, 150, 200)
 _TOOL = (40, 40, 40)
 _SHIFT_PX = 12
@@ -97,6 +107,20 @@ def _draw_component(frame, poly, color, state) -> None:
     cv2.rectangle(frame, (int(x0), int(y0 + dy)), (int(x1), int(y1 + dy)), color, -1)
 
 
+def _draw_detail(frame, poly, kind) -> None:
+    """A filled detail (torque stripe / label / ferrule) drawn on the component.
+
+    The ferrule's crimp ridges are drawn over its silver fill so it carries the edge
+    density its reader gates on -- what tells a metal sleeve from a flat white label.
+    """
+    x0, y0 = poly.min(axis=0)
+    x1, y1 = poly.max(axis=0)
+    cv2.rectangle(frame, (int(x0), int(y0)), (int(x1), int(y1)), _DETAIL_COLORS[kind], -1)
+    if kind == "ferrule":
+        for x in range(int(x0) + 2, int(x1), 3):
+            cv2.line(frame, (x, int(y0)), (x, int(y1)), _FERRULE_RIDGE, 1)
+
+
 def _draw_blob(frame, poly, color) -> None:
     """A skin-toned hand blob centered on ``poly`` (occludes a position or a zone)."""
     cx, cy = poly.mean(axis=0)
@@ -124,12 +148,21 @@ def _finish(frame, *, dim, blur, rng, sigma) -> np.ndarray:
     return out
 
 
+def _truth_details(spec) -> dict:
+    """The details drawn this frame: ``{position_id: {kind: "present"|"absent"}}``."""
+    return {
+        pid: {kind: state for kind, state in kinds.items()}
+        for pid, kinds in spec.get("details", {}).items()
+    }
+
+
 def _ground_truth(frame_id, spec, rail_ids, zone_ids, marker_visible) -> dict:
     spec_pos = spec.get("positions", {})
     spec_keepout = spec.get("keepout", {})
     return {
         "frame_id": frame_id,
         "positions": {rid: spec_pos.get(rid, "absent") for rid in rail_ids},
+        "details": _truth_details(spec),
         "motion": bool(spec.get("motion", False)),
         "keepout": {zid: bool(spec_keepout.get(zid, False)) for zid in zone_ids},
         "marker_visible": marker_visible,
@@ -153,6 +186,10 @@ def _render_frame(spec, frame_id, ctx) -> np.ndarray:
             )
         if state == "occluded":
             _draw_blob(frame, ctx["rail_polys"][rid], _SKIN)
+    for pid, kinds in spec.get("details", {}).items():
+        for kind, detail_state in kinds.items():
+            if detail_state == "present":
+                _draw_detail(frame, ctx["detail_polys"][pid][kind], kind)
     for zid in ctx["zone_ids"]:
         if spec.get("keepout", {}).get(zid):
             _draw_blob(frame, ctx["keepout_polys"][zid], _SKIN)
@@ -176,6 +213,11 @@ def _build_context(render_opts) -> dict:
     keepout_rois = render_opts.get("keepout_rois", _KEEPOUT_ROIS)
     corners = _marker_corners(marker_xy, marker_px)
     rail_polys = {rid: region_to_pixels(region, corners) for rid, region in rail_positions.items()}
+    detail_regions = render_opts.get("detail_regions", DEFAULT_DETAIL_REGIONS)
+    detail_polys = {
+        pid: {kind: region_to_pixels(region, corners) for kind, region in kinds.items()}
+        for pid, kinds in detail_regions.items()
+    }
     keepout_polys = {
         zid: region_to_pixels(roi["region"], corners) for zid, roi in keepout_rois.items()
     }
@@ -189,6 +231,7 @@ def _build_context(render_opts) -> dict:
         "rail_ids": list(rail_positions),
         "zone_ids": list(keepout_rois),
         "rail_polys": rail_polys,
+        "detail_polys": detail_polys,
         "station_poly": region_to_pixels(station_zone["region"], corners),
         "keepout_polys": keepout_polys,
         "rail_y": rail_y,

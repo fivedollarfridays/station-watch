@@ -13,22 +13,73 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 DETECTOR = "station_watch.detect:real-pipeline:v1"
 BASELINE_DETECTOR = "frame_diff_baseline:v1"
 
+# Each dataset kind owns its measurement subtree: a synthetic (proving) number can
+# never be written where a real number lives, and vice versa.
+_CONFINE_DIRS = {
+    "synthetic": ("measurements/synthetic",),
+    "real": ("measurements/v1", "measurements/v2"),
+}
 
-def write_measurement(path: str | Path, provenance: dict, metrics: dict) -> None:
+
+def confine_out(out: Path, dataset_kind: str, *, force_out: bool = False) -> Path:
+    """Resolve ``out`` only if it lands in ``dataset_kind``'s own measurement tree.
+
+    The returned path is fully resolved (``..`` normalized, symlinks followed), so a
+    ``..`` segment or a symlink that escapes the allowed tree is caught here rather
+    than silently writing elsewhere. A disallowed path raises ``ValueError`` naming
+    the rule; ``force_out`` overrides it with one warning line on stderr.
+    """
+    bases = _CONFINE_DIRS.get(dataset_kind)
+    if bases is None:
+        raise ValueError(
+            f"unknown dataset_kind {dataset_kind!r}; expected one of {sorted(_CONFINE_DIRS)}"
+        )
+    resolved = Path(out).resolve()
+    allowed = [Path(base).resolve() for base in bases]
+    if any(resolved == base or base in resolved.parents for base in allowed):
+        return resolved
+    rule = (
+        f"a {dataset_kind} measurement must be written inside "
+        f"{' or '.join(base + '/' for base in bases)}"
+    )
+    if force_out:
+        sys.stderr.write(f"station-watch: WARNING: --force-out writes {resolved} outside {rule}\n")
+        return resolved
+    raise ValueError(f"refusing to write {resolved}: {rule}")
+
+
+def write_measurement(
+    path: str | Path,
+    provenance: dict,
+    metrics: dict | None = None,
+    *,
+    status: str | None = None,
+    reason: str | None = None,
+) -> None:
     """Write one measurement file in the one format: ``{provenance, metrics}``.
 
     The single writer every measurement file goes through (the evaluate harness and
     the fault drill both call it), so there is never a second on-disk shape for the
     claims test to chase -- metric keys stay addressable as dotted paths under
-    ``metrics``.
+    ``metrics``. A caller with no numbers to record (an ``audit score`` session that
+    failed QA or carried no reviewed flags) passes ``status`` (and optionally
+    ``reason``) instead: it lands at the top level beside ``provenance`` and the
+    ``metrics`` key is omitted, so the file is still this one format, not a second.
     """
-    payload = {"provenance": provenance, "metrics": metrics}
+    payload: dict = {"provenance": provenance}
+    if status is not None:
+        payload["status"] = status
+    if reason is not None:
+        payload["reason"] = reason
+    if metrics is not None:
+        payload["metrics"] = metrics
     Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
@@ -55,9 +106,19 @@ def build_provenance(
     detector: str,
     clips: int,
     sessions: list[str],
+    split: str | None = None,
+    clip_sha256s: list[str] | None = None,
+    recorded_on: dict | None = None,
+    calibration: object | None = None,
 ) -> dict:
-    """Assemble the provenance block for a measurement file (one detector's numbers)."""
-    return {
+    """Assemble the provenance block for a measurement file (one detector's numbers).
+
+    The HF3.8 split fields (``split``, ``clip_sha256s``, ``recorded_on`` and, for a
+    held-out run, ``calibration``) are added only when supplied, so callers that do
+    not track a split -- the fault drill and the physics scripts -- write exactly the
+    block they always have.
+    """
+    provenance = {
         "dataset": dataset,
         "dataset_kind": dataset_kind,
         "manifest_sha256": manifest_sha256,
@@ -68,6 +129,15 @@ def build_provenance(
         "sessions": list(sessions),
         "date_utc": datetime.now(UTC).date().isoformat(),
     }
+    if split is not None:
+        provenance["split"] = split
+    if clip_sha256s is not None:
+        provenance["clip_sha256s"] = sorted(clip_sha256s)
+    if recorded_on is not None:
+        provenance["recorded_on"] = dict(recorded_on)
+    if calibration is not None:
+        provenance["calibration"] = calibration
+    return provenance
 
 
 __all__ = [
@@ -76,4 +146,5 @@ __all__ = [
     "git_commit",
     "build_provenance",
     "write_measurement",
+    "confine_out",
 ]

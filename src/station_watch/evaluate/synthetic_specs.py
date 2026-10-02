@@ -11,7 +11,14 @@ from __future__ import annotations
 
 import numpy as np
 
+from station_watch.detect.details import DEFAULT_DETAIL_REGIONS
 from station_watch.detect.geometry import region_to_pixels
+
+# The three detail kinds, read on rail_pos_1 at their default regions. Configured as
+# slot_details (so the DetailTracker reads and scores them) but not required -- a missing
+# detail here is scored in the rail confusion matrix, not faulted (HF3.16).
+SLOT_DETAILS = {"rail_pos_1": dict(DEFAULT_DETAIL_REGIONS["rail_pos_1"])}
+_DETAIL_KINDS = ("torque_stripe", "label", "ferrule")
 
 DATASET = "synthetic-proving"
 SPEED = 4.0
@@ -89,6 +96,7 @@ def config_dict() -> dict:
             "darkness_threshold": 40.0,
             "occlusion_threshold": 0.5,
             "unknown_grace_s": 10_000.0,
+            "slot_details": SLOT_DETAILS,
         },
     }
 
@@ -97,22 +105,23 @@ _BOTH = {"rail_pos_1": "present", "rail_pos_2": "present"}
 _MISS = {"rail_pos_1": "absent", "rail_pos_2": "present"}
 
 
-def _f(states, *, motion=False, hide=False):
+def _f(states, *, motion=False, hide=False, details=None):
     spec = {"positions": dict(states)}
     if motion:
         spec["motion"] = True
     if hide:
         spec["hide_marker"] = True
+    if details:
+        spec["details"] = {"rail_pos_1": dict(details)}
     return spec
 
 
-def _stall_script():
-    """Short motion/still cycles (closed steps, each still under the window) then a
-    final long still that actually stalls -- the only clip that should fault stalled."""
+def _cycles(repeats: int, motion: int, still: int) -> list[dict]:
+    """``repeats`` motion runs, each closed by a still run: closed steps, none stalled."""
     cycles: list[dict] = []
-    for _ in range(3):
-        cycles += [_f(_BOTH, motion=True)] * 6 + [_f(_BOTH)] * 6
-    return cycles + [_f(_BOTH, motion=True)] * 6 + [_f(_BOTH)] * 60  # final still starts at 42
+    for _ in range(repeats):
+        cycles += [_f(_BOTH, motion=True)] * motion + [_f(_BOTH)] * still
+    return cycles
 
 
 def _both():
@@ -129,6 +138,27 @@ def _moving(states, n, **kw) -> list[dict]:
     return [_f(states, motion=True, **kw) for _ in range(n)]
 
 
+def _detail_positions(last, states) -> list[dict]:
+    """Manifest ``positions`` entries for rail_pos_1's detail targets over the whole clip."""
+    return [
+        {"target": f"rail_pos_1.{kind}", "state": state, "start_frame": 0, "end_frame": last}
+        for kind, state in states.items()
+    ]
+
+
+def _detail_clip(session, name, missing_kind) -> dict:
+    """A both-present clip with every rail_pos_1 detail drawn except ``missing_kind``.
+
+    Scores the detail targets in the rail confusion matrix: the two drawn kinds read
+    present, the omitted one reads absent. Components stay present and the clip runs
+    continuous motion, so no part/stall/keep-out fault fires -- only the detail reads
+    differ (HF3.16). ``missing_kind`` is not required, so a missing detail is measured,
+    not faulted."""
+    states = {kind: ("absent" if kind == missing_kind else "present") for kind in _DETAIL_KINDS}
+    script = _moving(_BOTH, 48, details=states)
+    return _clip("s1", name, script, 47, extra_positions=_detail_positions(47, states))
+
+
 def _blind_clip() -> dict:
     """Marker visible for 16 frames, then hidden: both slots read unknown after."""
     unknown = [
@@ -143,18 +173,27 @@ def _blind_clip() -> dict:
 def clip_specs() -> list[dict]:
     """Each clip: session, name, render script, ground-truth labels, keep-out backend.
 
-    Non-stall clips run continuous motion so the station zone never falsely stalls
-    (the Judge's stall is wall-time since the last motion, so a quiet clip would).
+    Non-stall clips run continuous motion (``normal`` short motion/still cycles that
+    end in motion) so the station zone never falsely stalls (the Judge's stall is
+    wall-time since the last motion, so a long quiet stretch would).
     """
     missing = _clip("s1", "missing", _moving(_MISS, 48), 47)
     missing["target_states"] = [("rail_pos_1", "absent"), ("rail_pos_2", "present")]
     stall = {"stalls": [{"start_frame": 42, "end_frame": 101}]}
+    # Short motion/still cycles (each still under the window), then a final long
+    # still that actually stalls -- the only clip that should fault stalled.
+    stall_script = _cycles(3, 6, 6) + [_f(_BOTH, motion=True)] * 6 + [_f(_BOTH)] * 60
     keepout = {"keepouts": [{"zone": "zone_press", "start_frame": 14, "end_frame": 31}]}
     return [
-        _clip("s1", "normal", _moving(_BOTH, 48), 47),
+        # Normal work: ten closed motion/still steps (the step-time baseline's p95
+        # comes from these; continuous motion would close none), ending in motion.
+        # 95 frames.
+        _clip("s1", "normal", _cycles(10, 5, 4) + _moving(_BOTH, 5), 94),
         missing,
         _blind_clip(),
-        _clip("s2", "stall", _stall_script(), 101, stall),
+        _detail_clip("s1", "detail_missing_stripe", "torque_stripe"),
+        _detail_clip("s1", "detail_missing_label", "label"),
+        _clip("s2", "stall", stall_script, 101, stall),
         _clip("s2", "keepout", _moving(_BOTH, 32), 31, keepout, backend=("enter", 6)),
     ]
 
@@ -172,6 +211,7 @@ __all__ = [
     "KEEPOUT",
     "MARKER_CORNERS",
     "RAIL",
+    "SLOT_DETAILS",
     "SPEED",
     "STATION_ZONE",
     "ClearBackend",

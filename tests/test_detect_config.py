@@ -122,3 +122,47 @@ def test_empty_positions_and_zones_are_allowed(tmp_path):
     cfg = _load(tmp_path, data)
     assert cfg.detect["rail_positions"] == {}
     assert cfg.detect["keepout_rois"] == {}
+
+
+# --- HF3.15: dotted detail slots (<position_id>.<kind>) and detect.slot_details ---
+
+STRIPE_REGION = [[0.85, 2.05], [1.55, 2.05], [1.55, 2.25], [0.85, 2.25]]
+
+
+def _with_detail(data):
+    data["required_slots"] = ["rail_pos_1", "rail_pos_1.torque_stripe"]
+    data["detect"]["slot_details"] = {"rail_pos_1": {"torque_stripe": STRIPE_REGION}}
+    return data
+
+
+def test_required_detail_with_region_loads(tmp_path):
+    cfg = _load(tmp_path, _with_detail(copy.deepcopy(BASE)))
+    assert cfg.detect["slot_details"]["rail_pos_1"]["torque_stripe"] == STRIPE_REGION
+    assert "rail_pos_1.torque_stripe" in cfg.required_slots
+
+
+def test_required_detail_without_slot_details_region_names_dotted_key(tmp_path):
+    data = copy.deepcopy(BASE)
+    data["required_slots"] = ["rail_pos_1.torque_stripe"]
+    # no detect.slot_details at all
+    with pytest.raises(KeyError) as exc:
+        _load(tmp_path, data)
+    assert "detect.slot_details.rail_pos_1.torque_stripe" in str(exc.value)
+
+
+def test_required_detail_with_unregistered_kind_names_dotted_key(tmp_path):
+    data = copy.deepcopy(BASE)
+    data["required_slots"] = ["rail_pos_1.not_a_kind"]
+    data["detect"]["slot_details"] = {"rail_pos_1": {"not_a_kind": STRIPE_REGION}}
+    with pytest.raises(ValueError) as exc:
+        _load(tmp_path, data)
+    assert "rail_pos_1.not_a_kind" in str(exc.value)
+
+
+def test_required_detail_whose_position_has_no_rail_position_names_key(tmp_path):
+    data = copy.deepcopy(BASE)
+    data["required_slots"] = ["ghost.torque_stripe"]
+    data["detect"]["slot_details"] = {"ghost": {"torque_stripe": STRIPE_REGION}}
+    with pytest.raises(KeyError) as exc:
+        _load(tmp_path, data)
+    assert "detect.rail_positions.ghost" in str(exc.value)

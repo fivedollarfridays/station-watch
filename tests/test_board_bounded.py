@@ -137,12 +137,18 @@ def test_every_render_query_uses_the_index_without_a_temp_sort(tmp_path, monkeyp
     log_path = _long_log(tmp_path / "log.db", frames=50, verdicts=50, blinds=10)
     _, _, statements = _count_rows_per_render(monkeypatch, log_path, _t(10))
     assert statements, "the render issued no queries"
+    # Only queries over the records table must be index-backed and bounded; the
+    # one-time ``sqlite_master`` probe for the blind-reason index is metadata.
+    data_queries = [s for s in set(statements) if "FROM records" in s]
+    assert data_queries, "the render issued no data queries"
     conn = sqlite3.connect(log_path)
     try:
-        for sql in set(statements):
+        for sql in data_queries:
             params = (None,) * sql.count("?")
             plan = " | ".join(row[3] for row in conn.execute(f"EXPLAIN QUERY PLAN {sql}", params))
-            assert "USING INDEX records_kind_ts" in plan, f"{sql}: {plan}"
+            assert (
+                "USING INDEX records_kind_ts" in plan or "USING INDEX records_blind_reason" in plan
+            ), f"{sql}: {plan}"
             assert "TEMP B-TREE" not in plan, f"{sql}: {plan}"
             assert "LIMIT" in sql.upper(), f"unbounded render query: {sql}"
     finally:

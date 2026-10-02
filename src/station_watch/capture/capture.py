@@ -32,23 +32,27 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from station_watch.capture.blind import BlindThresholds, BlindWatch
-from station_watch.capture.fiducial import find_marker_center
 from station_watch.capture.metrics import fingerprint, mean_luma, noise_score
 from station_watch.capture.resilience import (
     DetectStep,
-    error_detail,
     liveness_loop,
+    read_frame,
+    record_frame_failure,
     reopen_source,
-    report,
 )
 from station_watch.capture.source import FrameSource
 from station_watch.clock import utc_now_iso
 from station_watch.detect.detector import Detector
-from station_watch.records import FrameRecord
+from station_watch.detect.geometry import find_marker_corners, marker_center
+from station_watch.records import BlindState, FrameRecord
+
+if TYPE_CHECKING:  # annotation only: importing it at runtime forms a cycle via evidence
+    from station_watch.evidence import EvidenceStore
 
 _MONO_EPSILON = 1e-9
 _BACKOFF_START_S = 0.05
@@ -71,6 +75,7 @@ class Capture:
         monotonic: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
         detector: Detector | None = None,
+        evidence: EvidenceStore | None = None,
     ):
         if speed <= 0:
             raise ValueError(f"speed must be positive, got {speed}")
@@ -84,6 +89,7 @@ class Capture:
         self._monotonic = monotonic
         self._sleep = sleep
         self._detect = DetectStep(detector) if detector is not None else None
+        self._evidence = evidence
         self._stopped = False
         self._stop_event = threading.Event()
         self.first_frame = threading.Event()
@@ -101,7 +107,9 @@ class Capture:
         fps = self._fps_override if self._fps_override is not None else self._source.fps
         return 1.0 / fps if fps > 0 else 0.0
 
-    def _record(self, frame: np.ndarray, frame_id: int, mono: float) -> FrameRecord:
+    def _record(
+        self, frame: np.ndarray, frame_id: int, mono: float, marker_found: bool | None = None
+    ) -> FrameRecord:
         prev = self._prev
         return FrameRecord(
             station_id=self._station_id,
@@ -113,6 +121,7 @@ class Capture:
             mean_luma=mean_luma(frame),
             noise_score=noise_score(frame, prev),
             run_id=self._run_id,
+            marker_found=marker_found,
         )
 
     def frames(self) -> Iterator[FrameRecord]:
@@ -157,7 +166,7 @@ class Capture:
             station_id=self._station_id,
             camera_id=self._camera_id,
             run_id=self._run_id,
-            sink=log.append,
+            sink=self._blind_sink(log),
             clock=self._clock,
         )
         start = self._monotonic()
@@ -175,6 +184,24 @@ class Capture:
             stop_event.set()
             timer.join(timeout=1.0)
 
+    def _blind_sink(self, log):
+        """The Log sink for blind records, teeing an opened record to the evidence store.
+
+        A ``BlindRecord`` carries the last good frame id before the blind; writing
+        that frame as evidence keeps the citable "last we saw" shot a blind episode
+        points at. Teeing here (not inside the watch) keeps evidence optional and
+        off the blind state machine's path entirely.
+        """
+        if self._evidence is None:
+            return log.append
+
+        def sink(record) -> None:
+            log.append(record)
+            if record.state is BlindState.OPENED:
+                self._evidence.note_blind_open(record.last_good_frame_id)
+
+        return sink
+
     def _drive(self, log, watch: BlindWatch, fiducial: dict, start: float) -> None:
         """The frame loop: read, stamp, log, and fan each frame out to the watch."""
         interval = self._interval()
@@ -183,7 +210,7 @@ class Capture:
         frame_id = 0
         backoff = _BACKOFF_START_S
         while not self._stopped:
-            frame, error = self._read()
+            frame, error = read_frame(self._source)
             if frame is None:
                 if self._stopped:
                     return
@@ -209,32 +236,33 @@ class Capture:
         self, log, watch: BlindWatch, fiducial: dict, frame: np.ndarray, frame_id: int, mono: float
     ) -> None:
         """Stamp, log, and fan one frame out to the watch (may raise; the caller guards)."""
-        record = self._record(frame, frame_id, mono)
+        # Find the marker once per frame; stamp the frame with the result (the Judge
+        # never calls a never-seen marker healthy), derive the blind-watch center
+        # from its corners, and hand the same corners to Detect (K12).
+        corners = find_marker_corners(frame, fiducial["dictionary_id"], fiducial["marker_id"])
+        record = self._record(frame, frame_id, mono, marker_found=corners is not None)
         log.append(record)
         self.first_frame.set()
-        center = find_marker_center(frame, fiducial["dictionary_id"], fiducial["marker_id"])
-        watch.observe_frame(record, center)
+        watch.observe_frame(record, marker_center(corners))
+        had_observation = False
         if self._detect is not None:
-            self._detect(log, frame, record.frame_id, record.ts)
+            had_observation = self._detect(log, frame, record.frame_id, record.ts, corners) > 0
+        if self._evidence is not None:
+            # Every frame is offered (any may be a blind's last good frame); the
+            # evidence store writes it only if cited, all off the Capture thread.
+            self._evidence.note_frame(
+                frame,
+                record.frame_id,
+                record.ts,
+                record.fingerprint,
+                corners,
+                had_observation=had_observation,
+            )
 
     def _frame_failed(self, watch: BlindWatch, exc: Exception, frame_id: int) -> None:
         """Record a per-frame processing error as ``disconnected``; report it once."""
         self._prev = None
-        detail = error_detail(exc)
-        try:
-            opened = watch.read_failed({"error": detail})
-        except Exception as record_exc:  # the Log itself may be what is failing
-            detail = f"{detail} (and could not record it: {record_exc!r})"
-            opened = True
-        if opened:
-            report(f"capture frame {frame_id} processing failed: {detail}")
-
-    def _read(self) -> tuple[np.ndarray | None, Exception | None]:
-        """One read; K10: a read that raises is unobservable, never a crash."""
-        try:
-            return self._source.read(), None
-        except Exception as exc:  # any driver failure is "no frame"
-            return None, exc
+        record_frame_failure(watch, exc, frame_id)
 
     def _read_failed(self, watch: BlindWatch, error: Exception | None, backoff: float) -> float:
         """Record the failure, wait out the backoff, reopen a live device; next backoff."""

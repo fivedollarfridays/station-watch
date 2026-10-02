@@ -131,3 +131,56 @@ def test_relative_clips_dir_still_resolves_contained_clips(tmp_path, monkeypatch
     monkeypatch.chdir(tmp_path)
     loaded = load_manifest(str(_manifest_naming(tmp_path, "s1/a.mkv")), ".")
     assert loaded.clips[0].clip_path.exists()
+
+
+# --- HF3.8: split / recorded_on / clip_sha256 (backward compatible) --------------
+
+
+def test_hf2_manifest_with_no_split_loads_every_clip_as_calibration(tmp_path):
+    """An HF2-format manifest (no split, no recorded_on) loads unchanged: every clip
+    is calibration, has no recorded_on, and carries the SHA-256 of its bytes."""
+    clips_dir = tmp_path / "clips"
+    _write_clip(clips_dir / "s1/a.mkv")
+    loaded = load_manifest(str(_manifest_naming(tmp_path, "s1/a.mkv")), clips_dir)
+    clip = loaded.clips[0]
+    assert clip.split == "calibration"
+    assert clip.recorded_on is None
+    assert clip.clip_sha256 == sha256_file(clips_dir / "s1/a.mkv")
+    assert len(clip.clip_sha256) == 64
+
+
+def test_session_split_and_recorded_on_propagate_to_each_clip(tmp_path):
+    clips_dir = tmp_path / "clips"
+    _write_clip(clips_dir / "held/a.mkv")
+    manifest = tmp_path / "m.yaml"
+    manifest.write_text(
+        yaml.safe_dump(
+            {
+                "dataset": "d",
+                "sessions": [
+                    {
+                        "id": "held",
+                        "split": "held_out",
+                        "recorded_on": "2026-10-12",
+                        "clips": [{"path": "held/a.mkv"}],
+                    }
+                ],
+            }
+        )
+    )
+    clip = load_manifest(str(manifest), clips_dir).clips[0]
+    assert clip.split == "held_out"
+    assert clip.recorded_on == "2026-10-12"
+
+
+def test_unknown_split_value_is_refused(tmp_path):
+    clips_dir = tmp_path / "clips"
+    _write_clip(clips_dir / "s/a.mkv")
+    manifest = tmp_path / "m.yaml"
+    manifest.write_text(
+        yaml.safe_dump(
+            {"sessions": [{"id": "s", "split": "train", "clips": [{"path": "s/a.mkv"}]}]}
+        )
+    )
+    with pytest.raises(ManifestError, match="split"):
+        load_manifest(str(manifest), clips_dir)

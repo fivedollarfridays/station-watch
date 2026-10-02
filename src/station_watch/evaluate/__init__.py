@@ -21,12 +21,18 @@ from __future__ import annotations
 
 from station_watch.evaluate.manifest import ManifestError, NoLabeledSetError
 
-_LAZY = {"run_evaluation", "EXIT_NO_LABELED_SET", "EXIT_MISSING_CLIP"}
+_LAZY = {
+    "run_evaluation",
+    "EXIT_NO_LABELED_SET",
+    "EXIT_MISSING_CLIP",
+    "EXIT_CALIBRATION_LEAK",
+}
 
 __all__ = [
     "run_evaluation",
     "EXIT_NO_LABELED_SET",
     "EXIT_MISSING_CLIP",
+    "EXIT_CALIBRATION_LEAK",
     "ManifestError",
     "NoLabeledSetError",
 ]

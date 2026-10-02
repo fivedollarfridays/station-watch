@@ -13,7 +13,12 @@ import sys
 
 from station_watch.run import new_run_id
 from station_watch.runner.pipeline import Runner
-from station_watch.runner.startup import StartupError, build_context
+from station_watch.runner.startup import (
+    DEFAULT_EVIDENCE_DIR,
+    StartupError,
+    build_context,
+    default_evidence_dir,
+)
 from station_watch.watchdog import build_watchdog
 
 
@@ -24,20 +29,39 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     _add_run_parser(sub)
     _add_watchdog_parser(sub)
-    _add_fetch_model_parser(sub)
-    # The evaluate/board/drill/measure subcommands keep their arg wiring in a sibling
-    # `commandline` module, imported here so the parser knows them but the heavy work
-    # (OpenCV, renderers) stays deferred to each module's `handle`.
-    from station_watch.board.commandline import add_parser as add_board_parser
-    from station_watch.drill.commandline import add_parser as add_drill_parser
-    from station_watch.evaluate.commandline import add_parser as add_evaluate_parser
-    from station_watch.physics.commandline import add_parser as add_measure_parser
-
-    add_evaluate_parser(sub)
-    add_board_parser(sub)
-    add_drill_parser(sub)
-    add_measure_parser(sub)
+    for module in _lazy_commands().values():
+        module.add_parser(sub)
     return parser
+
+
+def _lazy_commands() -> dict:
+    """The subcommand modules beside run/watchdog, each imported once.
+
+    Their arg wiring lives beside their own logic; importing the (argparse-only)
+    modules here lets the parser know them while the heavy work (OpenCV, renderers,
+    the Log walk) stays deferred to each module's ``handle``.
+    """
+    import station_watch.audit.commandline as audit
+    import station_watch.board.commandline as board
+    import station_watch.detect.fetch_commandline as fetch_model
+    import station_watch.drill.commandline as drill
+    import station_watch.evaluate.commandline as evaluate
+    import station_watch.physics.commandline as measure
+    import station_watch.preflight.commandline as preflight
+    import station_watch.qa as qa
+    import station_watch.soak.commandline as soak
+
+    return {
+        "fetch-model": fetch_model,
+        "evaluate": evaluate,
+        "board": board,
+        "drill": drill,
+        "measure": measure,
+        "qa": qa,
+        "audit": audit,
+        "soak": soak,
+        "preflight": preflight,
+    }
 
 
 def _add_run_parser(sub) -> None:
@@ -84,6 +108,23 @@ def _add_run_parser(sub) -> None:
         type=int,
         help="stop after this many cycles (bounds a live-device or drill run)",
     )
+    _add_evidence_args(run)
+
+
+def _add_evidence_args(run) -> None:
+    """Where to keep evidence thumbnails of citable frames (HF3.4), or to skip them."""
+    run.add_argument(
+        "--evidence-dir",
+        default=default_evidence_dir(),
+        help="where to keep evidence thumbnails of citable frames (default: "
+        "data/local/evidence, or $STATION_WATCH_EVIDENCE_DIR; under the gitignored "
+        "local data dir)",
+    )
+    run.add_argument(
+        "--no-evidence",
+        action="store_true",
+        help="do not keep evidence thumbnails (write nothing under the evidence dir)",
+    )
 
 
 def _add_watchdog_parser(sub) -> None:
@@ -112,39 +153,6 @@ def _add_watchdog_parser(sub) -> None:
     )
 
 
-def _add_fetch_model_parser(sub) -> None:
-    fetch = sub.add_parser(
-        "fetch-model",
-        help="download the keep-out person model (Apache-2.0 YOLOX) and verify its hash",
-        description="Download the YOLOX-Nano ONNX weights (Apache-2.0) from the official "
-        "release into data/local/models/ and verify the SHA-256. This is the only network "
-        "call in the package; `run` never makes it. Weights are never committed.",
-    )
-    fetch.add_argument(
-        "--dest",
-        help="where to write the weights (default: data/local/models/yolox_nano.onnx)",
-    )
-
-
-def _fetch_model(args) -> int:
-    from station_watch.detect.fetch import fetch_model
-    from station_watch.detect.yolox import (
-        MODEL_LICENSE,
-        MODEL_NAME,
-        MODEL_SOURCE_URL,
-        WeightsError,
-    )
-
-    print(f"station-watch: fetching {MODEL_NAME} ({MODEL_LICENSE}) from {MODEL_SOURCE_URL}")
-    try:
-        path = fetch_model(args.dest)
-    except (WeightsError, OSError) as exc:
-        print(f"station-watch: fetch-model failed: {exc}", file=sys.stderr)
-        return 1
-    print(f"station-watch: verified weights written to {path}")
-    return 0
-
-
 def _run(args) -> int:
     try:
         context = build_context(
@@ -165,6 +173,7 @@ def _run(args) -> int:
         observations_path=args.observations,
         max_cycles=args.max_cycles,
         speed=args.speed,
+        evidence_dir=None if args.no_evidence else args.evidence_dir,
     )
     # SIGTERM (a service manager stopping the watch) finishes the current cycle
     # and shuts down cleanly, like Ctrl-C does.
@@ -197,25 +206,13 @@ def main(argv: list[str] | None = None) -> int:
         return _run(args)
     if args.command == "watchdog":
         return _watchdog(args)
-    if args.command == "fetch-model":
-        return _fetch_model(args)
     # The lazy subcommands dispatch to their sibling `commandline.handle`; the modules
     # were already imported when `build_parser` wired their args, so this is free.
-    from station_watch.board.commandline import handle as board_handle
-    from station_watch.drill.commandline import handle as drill_handle
-    from station_watch.evaluate.commandline import handle as evaluate_handle
-    from station_watch.physics.commandline import handle as measure_handle
-
-    handlers = {
-        "evaluate": evaluate_handle,
-        "board": board_handle,
-        "drill": drill_handle,
-        "measure": measure_handle,
-    }
-    if args.command in handlers:
-        return handlers[args.command](args)
+    commands = _lazy_commands()
+    if args.command in commands:
+        return commands[args.command].handle(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 
 
-__all__ = ["main", "build_parser"]
+__all__ = ["main", "build_parser", "DEFAULT_EVIDENCE_DIR"]

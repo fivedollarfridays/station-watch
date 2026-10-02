@@ -3,13 +3,13 @@
     "confusion_matrix": {
       "absent": {
         "absent": 0,
-        "none": 1,
+        "none": 3,
         "present": 0,
         "unknown": 0
       },
       "present": {
         "absent": 0,
-        "none": 9,
+        "none": 17,
         "present": 0,
         "unknown": 0
       },
@@ -25,7 +25,7 @@
       "fp": 0,
       "precision": null,
       "recall": null,
-      "tn": 5,
+      "tn": 7,
       "tp": 0
     },
     "keepout_entry": {
@@ -33,7 +33,7 @@
       "fp": 0,
       "precision": null,
       "recall": 0.0,
-      "tn": 4,
+      "tn": 6,
       "tp": 0
     },
     "latency": {
@@ -46,7 +46,7 @@
       "fp": 0,
       "precision": null,
       "recall": 0.0,
-      "tn": 4,
+      "tn": 6,
       "tp": 0
     },
     "per_session": {
@@ -54,13 +54,13 @@
         "confusion_matrix": {
           "absent": {
             "absent": 0,
-            "none": 1,
+            "none": 3,
             "present": 0,
             "unknown": 0
           },
           "present": {
             "absent": 0,
-            "none": 5,
+            "none": 13,
             "present": 0,
             "unknown": 0
           },
@@ -76,7 +76,7 @@
           "fp": 0,
           "precision": null,
           "recall": null,
-          "tn": 3,
+          "tn": 5,
           "tp": 0
         },
         "keepout_entry": {
@@ -84,7 +84,7 @@
           "fp": 0,
           "precision": null,
           "recall": null,
-          "tn": 3,
+          "tn": 5,
           "tp": 0
         },
         "latency": {
@@ -97,19 +97,19 @@
           "fp": 0,
           "precision": null,
           "recall": 0.0,
-          "tn": 2,
+          "tn": 4,
           "tp": 0
         },
         "rail_position_states": {
           "absent": {
             "precision": null,
             "recall": 0.0,
-            "support": 1
+            "support": 3
           },
           "present": {
             "precision": null,
             "recall": 0.0,
-            "support": 5
+            "support": 13
           },
           "unknown": {
             "precision": null,
@@ -122,7 +122,7 @@
           "fp": 0,
           "precision": null,
           "recall": null,
-          "tn": 3,
+          "tn": 5,
           "tp": 0
         },
         "time_to_alarm": [
@@ -216,12 +216,12 @@
       "absent": {
         "precision": null,
         "recall": 0.0,
-        "support": 1
+        "support": 3
       },
       "present": {
         "precision": null,
         "recall": 0.0,
-        "support": 9
+        "support": 17
       },
       "unknown": {
         "precision": null,
@@ -234,7 +234,7 @@
       "fp": 0,
       "precision": null,
       "recall": 0.0,
-      "tn": 4,
+      "tn": 6,
       "tp": 0
     },
     "time_to_alarm": [
@@ -247,17 +247,31 @@
     ]
   },
   "provenance": {
-    "clips": 5,
-    "config_sha256": "e96b07e6f1187bb3dc09c00927584e24d3f6c0d55355f9e2bf7248691bb27ac8",
+    "clip_sha256s": [
+      "30b29002eb62dbf5136acea337be4710348576023fbabefc3d5369bfdc70c661",
+      "465541d8dd3af34f5015c6b523b1d8075b455d82b7d064a6be6f5fecfb77a7e7",
+      "9853f5a5ce57faa46bc390aca798029e885e6bd772fe3b62c49fd8565fa0c5ab",
+      "a9de2fc0df170d01f7bb783948b1cfb2fe107c08f3ab5c85e2fa44c3e2a0d310",
+      "c0eb8c59529bae2425dfe92f62c04e486d199ebde72bdf83dfdea137231a3f2f",
+      "c4649862993c0fb2fba5f78246c49734b6a9f3af4d624d4c2255357f06b4bcfc",
+      "d26f163b2540da0a5895f4d88ff1447b0ae12b402f8d865c9d52cee45c499554"
+    ],
+    "clips": 7,
+    "config_sha256": "823f06810a126523b9fac14c53eac3c93dfbc175d6c8c9bdf05a606aeb2ff87c",
     "dataset": "synthetic-proving",
     "dataset_kind": "synthetic",
-    "date_utc": "2026-10-01",
+    "date_utc": "2026-10-02",
     "detector": "frame_diff_baseline:v1",
-    "git_commit": "e72497889f82dd4aeebc4b3d083b9d6f36908726",
-    "manifest_sha256": "11dab94ca1f7078dab2999c6c48c2a32d24666509f8e531ea2ca1e071efa2e05",
+    "git_commit": "657aaa45cc3d12b8feaf89d57b280c2da80e22bd",
+    "manifest_sha256": "6bb2458ed555d048a54a4b4e29b6863e7466b2f9bb13a377e90aa1151a0a06ae",
+    "recorded_on": {
+      "s1": null,
+      "s2": null
+    },
     "sessions": [
       "s1",
       "s2"
-    ]
+    ],
+    "split": "calibration"
   }
 }

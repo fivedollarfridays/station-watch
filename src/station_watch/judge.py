@@ -59,6 +59,11 @@ class Judge:
         )
         self._inputs = JudgeInputs(camera_id=config.camera_id, run_id=run_id)
 
+    @property
+    def stall_window_s(self) -> float:
+        """Seconds of no motion before ``stalled`` (measured p95 + grace, or takt + grace)."""
+        return self._stall_window
+
     def judge(self, log, now_ts: str | None = None, *, stream_ended: bool = False) -> Verdict:
         """Judge the station as of ``now_ts`` (default: now), writing the verdict.
 
@@ -69,6 +74,10 @@ class Judge:
         now = now_ts if now_ts is not None else self._clock()
         self._inputs.refresh(log, now)
         active = self._inputs.active_blind_reasons()
+        if self._inputs.marker_never_seen():
+            # K1 at startup: the debounced fiducial blind may not exist yet, but a
+            # camera that has never seen the marker is not confirmed to see the station.
+            active.add(BlindReason.FIDUCIAL_MISSING)
         if not stream_ended and self._frames_stale(log, now):
             active.add(BlindReason.DISCONNECTED)
         verdict = self._verdict(sorted(active, key=lambda r: r.value), now)

@@ -31,8 +31,10 @@ from collections.abc import Callable
 
 from station_watch.alarm.episodes import Alarm
 from station_watch.capture.capture import Capture
+from station_watch.capture.resilience import report
 from station_watch.clock import utc_now_iso
 from station_watch.detect.detector import build_detector
+from station_watch.evidence import EvidenceStore
 from station_watch.judge import Judge
 from station_watch.records import BlindReason, BlindRecord, BlindState, CycleCompleted
 from station_watch.runner.startup import RunContext
@@ -61,6 +63,7 @@ class Runner:
         observations_path: str | None = None,
         max_cycles: int | None = None,
         speed: float = 1.0,
+        evidence_dir: str | None = None,
         clock: Callable[[], str] = utc_now_iso,
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -69,6 +72,8 @@ class Runner:
         self._log = context.log
         self._thresholds = context.thresholds
         self._keepout_backend = context.keepout_backend
+        self._evidence_dir = evidence_dir
+        self._evidence_settings = context.evidence_settings
         self._run_id = run_id
         self._stages = resolve_stages(stop_stage)
         self._stop_stage_after = stop_stage_after
@@ -80,11 +85,13 @@ class Runner:
         self._stop = threading.Event()
         self._capture_error: BaseException | None = None
         self._capture_exit_reported = False
-        self._stall_window_s = context.stall_window_s
         self._stall_window_source = context.stall_window_source
         self._judge = Judge(
             self._config, run_id=run_id, clock=clock, stall_window_s=context.stall_window_s
         )
+        # The effective window the Judge resolved (a context with no window falls
+        # back to takt_s + grace_s); used for the startup banner below.
+        self._stall_window_s = self._judge.stall_window_s
         self._alarm = Alarm(self._config, run_id=run_id, sinks=context.sinks, clock=clock)
 
     def stop(self) -> None:
@@ -99,6 +106,7 @@ class Runner:
         )
         run_start_ts = self._clock()
         observations = self._load_observations(run_start_ts)
+        evidence = self._build_evidence()
         capture = Capture(
             self._source,
             station_id=self._config.station_id,
@@ -108,6 +116,7 @@ class Runner:
             clock=self._clock,
             monotonic=self._monotonic,
             detector=build_detector(self._config, self._run_id, self._keepout_backend),
+            evidence=evidence,
         )
         thread = threading.Thread(
             target=self._capture_main,
@@ -127,6 +136,27 @@ class Runner:
             capture.stop()
             thread.join(timeout=2.0)
             self._source.release()
+            if evidence is not None:
+                evidence.close()
+
+    def _build_evidence(self) -> EvidenceStore | None:
+        """The evidence store for this run, or ``None`` when disabled / unbuildable.
+
+        A store that cannot even be created (an unwritable evidence dir) is reported
+        once and the run proceeds without evidence -- evidence never fails the watch.
+        """
+        if self._evidence_dir is None:
+            return None
+        try:
+            return EvidenceStore(
+                self._evidence_dir,
+                self._run_id,
+                thumb_width=self._evidence_settings.thumb_width,
+                max_files=self._evidence_settings.max_files,
+            )
+        except OSError as exc:
+            report(f"evidence disabled: could not open {self._evidence_dir}: {exc}")
+            return None
 
     def _capture_main(self, capture: Capture) -> None:
         """The Capture thread body; an escaping error is kept for the exit alarm."""

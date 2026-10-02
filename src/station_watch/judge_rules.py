@@ -68,13 +68,19 @@ def stall_faults(by_target, now: str, window_s: float) -> list[Fault]:
 
 
 def missing_part_faults(by_target, required_slots) -> list[Fault]:
-    """``missing_part`` for each required slot whose latest part reading is absent."""
+    """``missing_part`` for each required slot whose latest part reading is absent.
+
+    A dotted detail slot (``<position_id>.<kind>``) raises no ``missing_part`` while
+    its parent position already has one -- a missing component is one fault (the
+    position), never also one per detail it carried.
+    """
     faults = []
     for slot in required_slots:
         newest = latest(by_target.get(slot, []), PART_KINDS)
         if newest is not None and newest.kind == ObservationKind.PART_ABSENT:
             faults.append(Fault(FaultKind.MISSING_PART, slot, (newest.frame_id,)))
-    return faults
+    faulted = {f.target for f in faults}
+    return [f for f in faults if "." not in f.target or f.target.split(".", 1)[0] not in faulted]
 
 
 def keepout_faults(by_target, keepout_zones) -> list[Fault]:

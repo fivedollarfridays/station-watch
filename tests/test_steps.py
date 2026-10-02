@@ -222,3 +222,31 @@ def test_configured_path_that_is_malformed_fails_loud_naming_it(tmp_path):
     with pytest.raises(StepTimesError) as exc:
         resolve_stall_window(_config(step_times_path=str(bad)))
     assert str(bad) in str(exc.value)
+
+
+def test_zero_steps_writes_a_status_with_no_metrics(tmp_path):
+    # K13: nothing measured is a status, never a 0.0 s "measured" step time.
+    path = tmp_path / "step_times.json"
+    write_step_times(path, {"count": 0, "p50_s": 0.0, "p95_s": 0.0}, {"step_clips": 4})
+    data = json.loads(path.read_text())
+    assert data["status"] == "no_steps_measured"
+    assert "metrics" not in data
+    assert data["provenance"]["step_clips"] == 4
+
+
+def test_a_no_steps_file_fails_loud_at_the_consumer(tmp_path):
+    path = tmp_path / "step_times.json"
+    write_step_times(path, {"count": 0, "p50_s": 0.0, "p95_s": 0.0}, {})
+    with pytest.raises(StepTimesError) as exc:
+        resolve_stall_window(_config(step_times_path=str(path)))
+    assert "no_steps_measured" in str(exc.value) and str(path) in str(exc.value)
+
+
+def test_a_zero_count_metrics_file_fails_loud_at_the_consumer(tmp_path):
+    # The degenerate shape an older producer committed: count 0, p95 0.0.
+    path = tmp_path / "step_times.json"
+    payload = {"provenance": {}, "metrics": {"count": 0, "p50_s": 0.0, "p95_s": 0.0}}
+    path.write_text(json.dumps(payload))
+    with pytest.raises(StepTimesError) as exc:
+        resolve_stall_window(_config(step_times_path=str(path)))
+    assert "no measured steps" in str(exc.value)

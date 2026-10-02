@@ -5,62 +5,62 @@
         "alarm": "unobservable:view_shifted",
         "alarm_count": 1,
         "blind_reason": "view_shifted",
-        "cleared_ts": "2026-10-01T12:51:32.045450+00:00",
+        "cleared_ts": "2026-10-02T17:38:05.668765+00:00",
         "exactly_one_alarm": true,
         "exactly_one_recovery": true,
         "expected_reason": [
           "view_shifted",
           "fiducial_missing"
         ],
-        "injected_ts": "2026-10-01T12:51:31.045450+00:00",
+        "injected_ts": "2026-10-02T17:38:04.668765+00:00",
         "reason_matches": true,
         "recovery_count": 1,
         "time_to_alarm_s": 0.2,
-        "time_to_recovery_s": 0.15
+        "time_to_recovery_s": 0.2
       },
       "cable_pulled": {
         "alarm": "unobservable:disconnected",
         "alarm_count": 1,
         "blind_reason": "disconnected",
-        "cleared_ts": "2026-10-01T12:51:34.245450+00:00",
+        "cleared_ts": "2026-10-02T17:38:07.868765+00:00",
         "exactly_one_alarm": true,
         "exactly_one_recovery": true,
         "expected_reason": [
           "disconnected"
         ],
-        "injected_ts": "2026-10-01T12:51:33.245450+00:00",
+        "injected_ts": "2026-10-02T17:38:06.868765+00:00",
         "reason_matches": true,
         "recovery_count": 1,
-        "time_to_alarm_s": 0.037701,
-        "time_to_recovery_s": 0.85
+        "time_to_alarm_s": 0.034005,
+        "time_to_recovery_s": 0.75
       },
       "frozen": {
         "alarm": "unobservable:frozen",
         "alarm_count": 1,
         "blind_reason": "frozen",
-        "cleared_ts": "2026-10-01T12:51:29.845450+00:00",
+        "cleared_ts": "2026-10-02T17:38:03.468765+00:00",
         "exactly_one_alarm": true,
         "exactly_one_recovery": true,
         "expected_reason": [
           "frozen"
         ],
-        "injected_ts": "2026-10-01T12:51:28.845450+00:00",
+        "injected_ts": "2026-10-02T17:38:02.468765+00:00",
         "reason_matches": true,
         "recovery_count": 1,
-        "time_to_alarm_s": 0.15,
+        "time_to_alarm_s": 0.2,
         "time_to_recovery_s": 0.15
       },
       "lens_covered": {
         "alarm": "unobservable:dark",
         "alarm_count": 1,
         "blind_reason": "dark",
-        "cleared_ts": "2026-10-01T12:51:27.645450+00:00",
+        "cleared_ts": "2026-10-02T17:38:01.268765+00:00",
         "exactly_one_alarm": true,
         "exactly_one_recovery": true,
         "expected_reason": [
           "dark"
         ],
-        "injected_ts": "2026-10-01T12:51:26.645450+00:00",
+        "injected_ts": "2026-10-02T17:38:00.268765+00:00",
         "reason_matches": true,
         "recovery_count": 1,
         "time_to_alarm_s": 0.3,
@@ -70,13 +70,13 @@
         "alarm": "unobservable:dark",
         "alarm_count": 1,
         "blind_reason": "dark",
-        "cleared_ts": "2026-10-01T12:51:36.445450+00:00",
+        "cleared_ts": "2026-10-02T17:38:10.068765+00:00",
         "exactly_one_alarm": true,
         "exactly_one_recovery": true,
         "expected_reason": [
           "dark"
         ],
-        "injected_ts": "2026-10-01T12:51:35.445450+00:00",
+        "injected_ts": "2026-10-02T17:38:09.068765+00:00",
         "reason_matches": true,
         "recovery_count": 1,
         "time_to_alarm_s": 0.3,
@@ -100,9 +100,9 @@
     "config_sha256": "ef33539e2073f9ff5531a851787cf314b62bab1987bbbfe7139daa1038cbd1fc",
     "dataset": "drill:drill-schedule",
     "dataset_kind": "synthetic",
-    "date_utc": "2026-10-01",
+    "date_utc": "2026-10-02",
     "detector": "station_watch.detect:real-pipeline:v1",
-    "git_commit": "c382d7e8b78148830d4eb93757475e0903af255e",
+    "git_commit": "657aaa45cc3d12b8feaf89d57b280c2da80e22bd",
     "manifest_sha256": "b7af3be67fceec8bd5b9755ea363b202e69463644f97a13f7e3cde59adca2002",
     "sessions": []
   }

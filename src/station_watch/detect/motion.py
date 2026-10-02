@@ -32,6 +32,7 @@ _METHOD = "station_zone_motion:frame_diff:v1"
 _DEFAULT_MOTION_AREA_FRAC = 0.005  # fraction of the zone that must change to read motion
 _NOISE_MULT = 4.0  # per-pixel change cutoff, as a multiple of the measured noise floor
 _MIN_CUTOFF = 14.0  # a floor on that cutoff, so a near-frozen scene can't drop it to noise
+_CORNER_TOLERANCE_PX = 3.0  # marker jitter up to this still diffs; a bigger move forgets
 _CONFIRMED = {"motion": ObservationKind.MOTION, "no_motion": ObservationKind.NO_MOTION}
 
 
@@ -49,7 +50,8 @@ class MotionTracker:
         self.darkness_threshold = config.detect["darkness_threshold"]
         self.persistence = config.detect["persistence_frames"]
         self.emit_interval = config.detect["emit_interval_s"]
-        self._prev_gray: np.ndarray | None = None
+        self._prev_crop: np.ndarray | None = None  # previous zone crop, cut under its corners
+        self._prev_corners: np.ndarray | None = None  # the corners that crop was cut with
         self._noise_floor: float | None = None
         self._kind: str | None = None  # bucket of the current streak: motion | no_motion
         self._frames: list[int] = []
@@ -60,15 +62,23 @@ class MotionTracker:
 
     def update(self, frame, frame_id: int, ts: str, corners) -> list[Observation]:
         """Read this frame's zone change (vs the previous readable frame) and persist."""
-        gray, ceiling = self._zone_gray(frame, corners)
-        if gray is None:
+        crop, mask, ceiling = self._zone_crop(frame, corners)
+        if crop is None:
             self._forget()  # unknown: drop the reading and the previous frame
             return []
-        if self._prev_gray is None or self._prev_gray.shape != gray.shape:
-            self._prev_gray = gray
-            return []  # first readable frame of a run: no pair to diff yet
-        moved, scores = self._classify(gray)
-        self._prev_gray = gray
+        # Only diff a pair whose crops were cut under (near-)identical corners, so
+        # the marker-anchored content is registered: a first frame, a changed crop
+        # shape, or a marker that jumped past the tolerance forgets the pair rather
+        # than reading the shift as motion (marker jitter must not look like work).
+        if (
+            self._prev_crop is None
+            or self._prev_crop.shape != crop.shape
+            or self._corners_moved(corners)
+        ):
+            self._remember(crop, corners)
+            return []
+        moved, scores = self._classify(crop, mask)
+        self._remember(crop, corners)
         return self._persist("motion" if moved else "no_motion", ceiling, scores, frame_id, ts)
 
     def unknown_all(self, frame_id: int, ts: str, cause: str, detail: str) -> list[Observation]:
@@ -76,29 +86,52 @@ class MotionTracker:
         self._forget()
         return []
 
-    def _zone_gray(self, frame, corners) -> tuple[np.ndarray | None, float]:
-        """Masked gray of the zone and a confidence ceiling, or ``(None, 0)`` if unknown."""
+    def _zone_crop(self, frame, corners) -> tuple[np.ndarray | None, np.ndarray | None, float]:
+        """Gray crop of the zone (cut to the polygon bbox) and its mask, or ``None``.
+
+        The crop is cut at *this frame's* marker-anchored bounding box, so the zone
+        content lands at the same crop coordinates however the marker sits in frame.
+        That registration is what keeps a frame diff from reading marker jitter --
+        which moves the bbox with the content -- as motion.
+        """
         if corners is None:
-            return None, 0.0
+            return None, None, 0.0
         poly = region_to_pixels(self.region, corners)
         height, width = frame.shape[:2]
         x0, y0 = poly.min(axis=0)
         x1, y1 = poly.max(axis=0)
         if x0 < 0 or y0 < 0 or x1 > width or y1 > height:
-            return None, 0.0
+            return None, None, 0.0
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        mask = np.zeros((height, width), np.uint8)
-        cv2.fillPoly(mask, [poly.reshape(-1, 1, 2)], 255)
-        self._mask = mask.astype(bool)
-        mean_luma = float(gray[self._mask].mean())
+        full_mask = np.zeros((height, width), np.uint8)
+        cv2.fillPoly(full_mask, [poly.reshape(-1, 1, 2)], 255)
+        rows, cols = slice(int(y0), int(y1) + 1), slice(int(x0), int(x1) + 1)
+        mask = full_mask[rows, cols].astype(bool)
+        crop = gray[rows, cols]
+        if not mask.any():
+            return None, None, 0.0
+        mean_luma = float(crop[mask].mean())
         if mean_luma < self.darkness_threshold:
-            return None, 0.0
+            return None, None, 0.0
         ceiling = round(mean_luma / (mean_luma + self.darkness_threshold / 2), 4)
-        return gray, ceiling
+        return crop, mask, ceiling
 
-    def _classify(self, gray: np.ndarray) -> tuple[bool, dict]:
+    def _corners_moved(self, corners) -> bool:
+        """True when the marker shifted past the tolerance since the stored crop."""
+        if self._prev_corners is None:
+            return False
+        now = np.asarray(corners, dtype=np.float32).reshape(4, 2)
+        delta = float(np.linalg.norm(now - self._prev_corners, axis=1).max())
+        return delta > _CORNER_TOLERANCE_PX
+
+    def _remember(self, crop: np.ndarray, corners) -> None:
+        """Keep this crop and the corners it was cut with as the pair's prev frame."""
+        self._prev_crop = crop
+        self._prev_corners = np.asarray(corners, dtype=np.float32).reshape(4, 2)
+
+    def _classify(self, crop: np.ndarray, mask: np.ndarray) -> tuple[bool, dict]:
         """Changed-pixel fraction vs a noise-floor-calibrated cutoff; motion if it clears."""
-        diff = np.abs(gray.astype(np.int16) - self._prev_gray.astype(np.int16))[self._mask]
+        diff = np.abs(crop.astype(np.int16) - self._prev_crop.astype(np.int16))[mask]
         floor = float(diff.mean())
         if self._noise_floor is None or floor < self._noise_floor:
             self._noise_floor = floor
@@ -112,7 +145,8 @@ class MotionTracker:
         return fraction >= self.motion_area_frac, scores
 
     def _forget(self) -> None:
-        self._prev_gray = None
+        self._prev_crop = None
+        self._prev_corners = None
         self._kind = None
         self._frames = []
 

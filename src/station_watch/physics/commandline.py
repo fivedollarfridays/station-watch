@@ -7,6 +7,7 @@ runner: the heavy :mod:`station_watch.physics.runner` is imported lazily in :fun
 
 from __future__ import annotations
 
+import shlex
 import sys
 
 
@@ -53,13 +54,14 @@ def _command(args) -> str:
         parts.append("--synthetic")
     if args.clips:
         parts += ["--clips", args.clips]
-    return " ".join(parts)
+    return shlex.join(parts)  # quote paths with spaces/$ so the string re-parses exactly
 
 
 def handle(args) -> int:
     """Run the measurement described by parsed ``measure`` ``args``; return an exit code."""
     from station_watch.evaluate.manifest import ManifestError, NoLabeledSetError
     from station_watch.physics.runner import UnknownScriptError, run_measure
+    from station_watch.runner.startup import StartupError
 
     try:
         return run_measure(
@@ -74,7 +76,10 @@ def handle(args) -> int:
     except UnknownScriptError as exc:
         print(f"station-watch: {exc}", file=sys.stderr)
         return 2
-    except (ManifestError, NoLabeledSetError, OSError) as exc:
+    # A bad config (StartupError) or a clip that cannot be measured
+    # (ManifestError, e.g. it reports no fps) is one operator line, not a
+    # traceback -- exactly as `drill` does.
+    except (StartupError, ManifestError, NoLabeledSetError, OSError) as exc:
         print(f"station-watch: {exc}", file=sys.stderr)
         return 1
 

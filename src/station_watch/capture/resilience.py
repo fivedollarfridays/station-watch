@@ -47,6 +47,30 @@ def reopen_source(source) -> None:
         pass
 
 
+def read_frame(source):
+    """One read as ``(frame, error)``; K10: a read that raises is unobservable, never a crash."""
+    try:
+        return source.read(), None
+    except Exception as exc:  # any driver failure is "no frame"
+        return None, exc
+
+
+def record_frame_failure(watch, exc: BaseException, frame_id: int) -> None:
+    """Record a per-frame processing error as ``disconnected``; report it once.
+
+    The Log itself may be what is failing, so a failure to record is folded into the
+    reported detail rather than raised (K5: the watch never dies on a bad frame).
+    """
+    detail = error_detail(exc)
+    try:
+        opened = watch.read_failed({"error": detail})
+    except Exception as record_exc:
+        detail = f"{detail} (and could not record it: {record_exc!r})"
+        opened = True
+    if opened:
+        report(f"capture frame {frame_id} processing failed: {detail}")
+
+
 def liveness_loop(
     watch: BlindWatch,
     stop_event: threading.Event,
@@ -68,13 +92,20 @@ class DetectStep:
         self._detector = detector
         self._error_reported = False
 
-    def __call__(self, log, frame: np.ndarray, frame_id: int, ts: str) -> None:
-        """A Detect exception must not kill Capture and must not look disconnected:
+    def __call__(self, log, frame: np.ndarray, frame_id: int, ts: str, corners) -> int:
+        """Run Detect on one frame; return how many observations it emitted.
+
+        A Detect exception must not kill Capture and must not look disconnected:
         every target reads ``part_unknown`` with cause ``detect_error`` and the
-        error text, reported once per episode (a later clean read ends it).
+        error text, reported once per episode (a later clean read ends it). The
+        count lets Capture's evidence hook keep every frame a fault can cite -- a
+        fault's frame ids are exactly the frames Detect emitted an observation for.
+
+        ``corners`` are the marker corners Capture already found this frame, passed
+        through so Detect never searches for the marker a second time.
         """
         try:
-            observations = self._detector.process(frame, frame_id, ts)
+            observations = self._detector.process(frame, frame_id, ts, corners)
             self._error_reported = False
         except Exception as exc:  # a Detect fault is unknown, never a false disconnect
             detail = error_detail(exc)
@@ -84,6 +115,15 @@ class DetectStep:
             observations = self._detector.unknown_all(frame_id, ts, CAUSE_DETECT_ERROR, detail)
         for observation in observations:
             log.append(observation)
+        return len(observations)
 
 
-__all__ = ["DetectStep", "error_detail", "liveness_loop", "reopen_source", "report"]
+__all__ = [
+    "DetectStep",
+    "error_detail",
+    "liveness_loop",
+    "read_frame",
+    "record_frame_failure",
+    "reopen_source",
+    "report",
+]

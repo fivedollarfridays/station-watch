@@ -56,11 +56,34 @@ def _missing(dotted: str) -> KeyError:
     return KeyError(f"missing config key: {dotted}")
 
 
+def _validate_detail_slot(detect: dict[str, Any], slot: str) -> None:
+    """A required ``<position_id>.<kind>`` detail needs a position, a known kind, a region.
+
+    All three failures name the dotted key (K9): a required detail must never be
+    silently unreadable. ``DETAIL_KINDS`` is imported lazily so the detail method
+    registry is the single source of truth for which kinds exist.
+    """
+    from station_watch.detect.details import DETAIL_KINDS
+
+    pid, kind = slot.split(".", 1)
+    if pid not in detect["rail_positions"]:
+        raise _missing(f"detect.rail_positions.{pid} (required detail {slot})")
+    if kind not in DETAIL_KINDS:
+        raise ValueError(
+            f"config key required_slots entry {slot!r}: {kind!r} is not a registered "
+            f"detail kind {DETAIL_KINDS}"
+        )
+    if kind not in detect.get("slot_details", {}).get(pid, {}):
+        raise _missing(f"detect.slot_details.{slot}")
+
+
 def _validate_detect_coverage(data: dict[str, Any]) -> None:
-    """Every required slot needs a rail position and every keep-out zone an ROI (K9)."""
+    """Every required slot needs a rail position (or a detail region) and each zone an ROI (K9)."""
     detect = data["detect"]
     for slot in data["required_slots"]:
-        if slot not in detect["rail_positions"]:
+        if "." in slot:
+            _validate_detail_slot(detect, slot)
+        elif slot not in detect["rail_positions"]:
             raise _missing(f"detect.rail_positions.{slot}")
     for zone in data["keepout_zones"]:
         if zone not in detect["keepout_rois"]:

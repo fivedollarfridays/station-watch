@@ -23,6 +23,7 @@ a Detector and refuses ``--observations`` (one source of observations per run).
 
 from __future__ import annotations
 
+from station_watch.detect.details import DetailTracker, detail_targets_configured
 from station_watch.detect.geometry import find_marker_corners
 from station_watch.detect.keepout import KeepoutTracker
 from station_watch.detect.motion import MotionTracker
@@ -49,6 +50,7 @@ def detect_targets_configured(config) -> bool:
         bool(config.detect["rail_positions"])
         or _motion_configured(config)
         or bool(config.keepout_zones)
+        or detail_targets_configured(config)
     )
 
 
@@ -71,22 +73,34 @@ class Detector:
         self._run_id = run_id
         self._fiducial = config.fiducial
         self._trackers: list = []
+        position_tracker = None
         if config.detect["rail_positions"]:
-            self.add_tracker(PositionTracker(config, run_id))
+            position_tracker = PositionTracker(config, run_id)
+            self.add_tracker(position_tracker)
         if _motion_configured(config):
             self.add_tracker(MotionTracker(config, run_id))
         if config.keepout_zones:
             self.add_tracker(KeepoutTracker(config, run_id, keepout_backend))
+        # Details come last so each frame's parent-position confirmed state is already
+        # updated when a detail is judged against it.
+        if detail_targets_configured(config):
+            self.add_tracker(DetailTracker(config, run_id, position_tracker))
 
     def add_tracker(self, tracker) -> None:
         """Compose one more tracker into the per-frame fan-out."""
         self._trackers.append(tracker)
 
-    def process(self, frame, frame_id: int, ts: str) -> list[Observation]:
-        """Find the marker once and let every tracker read this frame."""
-        corners = find_marker_corners(
-            frame, self._fiducial["dictionary_id"], self._fiducial["marker_id"]
-        )
+    def process(self, frame, frame_id: int, ts: str, corners=None) -> list[Observation]:
+        """Let every tracker read this frame, finding the marker only if not given.
+
+        Capture finds the corners once per frame and passes them in; a caller
+        without them (the physics scripts) leaves ``corners=None`` and the Detector
+        searches itself -- so the marker is never detected twice on the live path.
+        """
+        if corners is None:
+            corners = find_marker_corners(
+                frame, self._fiducial["dictionary_id"], self._fiducial["marker_id"]
+            )
         out: list[Observation] = []
         for tracker in self._trackers:
             out.extend(tracker.update(frame, frame_id, ts, corners))

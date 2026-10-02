@@ -125,7 +125,7 @@ def _open_blind_reasons(reader: LogReader) -> tuple[str, ...]:
     """Reasons whose newest BlindRecord is still ``opened`` (one row per reason)."""
     open_reasons = []
     for reason in BlindReason:
-        record = reader.newest_matching("blind", "reason", reason.value)
+        record = reader.newest_with_reason("blind", reason.value)
         if record is not None and record.state == BlindState.OPENED:
             open_reasons.append((record.ts, reason.value))
     return tuple(reason for _, reason in sorted(open_reasons, reverse=True))

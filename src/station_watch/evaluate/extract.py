@@ -51,7 +51,12 @@ class ClipOutcome:
 
 def _gt_flags(label) -> set:
     flags: set = set()
-    if any(_norm_state(p["state"]) == "absent" for p in label.positions):
+    # The component-level ``missing_part`` flag is about rail positions, not details: a
+    # detail target (dotted ``<pid>.<kind>``) reads present/absent into the rail
+    # confusion matrix (HF3.16), and whether a missing detail *faults* is governed by
+    # required_slots at run time, not by this clip-level flag. So an absent detail never
+    # by itself sets the missing_part flag here.
+    if any(_norm_state(p["state"]) == "absent" for p in label.positions if "." not in p["target"]):
         flags.add("missing_part")
     if label.stalls:
         flags.add("stalled")
