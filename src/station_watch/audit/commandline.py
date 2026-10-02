@@ -50,7 +50,13 @@ def _run_review(args) -> int:
         f"station-watch audit review: serving {args.audit} on "
         f"http://{host}:{port}/ (Ctrl-C to stop)"
     )
-    print(f"station-watch audit review: token {server.token}", file=sys.stderr)
+    # The sign-in URL is the operator's only way in (the page is token-gated), so it
+    # is printed once, here, on stderr, and nowhere else: never in stdout, a page or
+    # a rejected-request log line.
+    print(
+        f"station-watch audit review: sign in at http://{host}:{port}/?token={server.token}",
+        file=sys.stderr,
+    )
     sys.stdout.flush()
     sys.stderr.flush()
     try:

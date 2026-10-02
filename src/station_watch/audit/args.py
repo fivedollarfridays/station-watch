@@ -56,7 +56,10 @@ def _add_review(actions) -> None:
         help="serve the sheet with a correct/incorrect control on 127.0.0.1",
         description="Serve <audit dir>/flags.json as a review page on loopback with a "
         "correct/incorrect control and an optional note per flag; marks append to "
-        "verdicts.jsonl. Token-gated, loopback-only, with a per-response CSP.",
+        "verdicts.jsonl. Bound to 127.0.0.1 only. Every request needs the session token: "
+        "open the sign-in URL printed once on stderr at startup, which sets it as an "
+        "HttpOnly cookie (without it the page is 401, with a wrong one 403). Every page "
+        "carries a per-response CSP.",
     )
     review.add_argument("--audit", required=True, help="the audit dir holding flags.json")
     review.add_argument(

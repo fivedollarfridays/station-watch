@@ -31,6 +31,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from station_watch.board.render import render_html, render_view_json
 from station_watch.board.view import build_view
 from station_watch.clock import utc_now_iso
+from station_watch.logsafe import loggable_path
 
 LOOPBACK = "127.0.0.1"
 REQUEST_TIMEOUT_S = 10.0
@@ -101,7 +102,8 @@ class BoardHandler(BaseHTTPRequestHandler):
 
     def _log_rejected(self, status: int, reason: str) -> None:
         # One line, no request headers: method, path, status, reason.
-        sys.stderr.write(f"station-watch board: {status} {self.command} {self.path} ({reason})\n")
+        method, path = loggable_path(self.command), loggable_path(self.path)
+        sys.stderr.write(f"station-watch board: {status} {method} {path} ({reason})\n")
 
     def __getattr__(self, name: str):
         # The stdlib dispatches method X to ``do_X`` and answers 501 when it is

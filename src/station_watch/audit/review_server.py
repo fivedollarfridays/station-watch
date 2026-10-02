@@ -1,7 +1,10 @@
 """The ``audit review`` HTTP face: a stdlib threading server bound to 127.0.0.1.
 
-``GET /`` serves the HF3.5 sheet with a correct/incorrect control per flag and sets
-the session token as an ``HttpOnly`` cookie; ``POST /verdict`` records a mark. Every
+``GET /`` serves the HF3.5 sheet with a correct/incorrect control per flag, but only
+with the session token: ``GET /?token=<token>`` (the URL printed once at startup)
+sets it as an ``HttpOnly`` cookie and redirects to ``/``; after that the cookie (or
+an ``X-Audit-Token`` header) serves the page. No token is 401, a wrong one 403.
+``POST /verdict`` records a mark. Every
 response carries a fresh-nonce ``Content-Security-Policy`` (the one marking script
 carries the matching nonce), ``X-Content-Type-Options: nosniff`` and
 ``Cache-Control: no-store``. A ``POST`` is accepted only with the token (cookie or
@@ -22,6 +25,7 @@ import station_watch.audit.review_guards as guards
 from station_watch.audit.review_html import render_review_sheet
 from station_watch.audit.verdicts import VALID_VERDICTS, append_mark, effective
 from station_watch.clock import utc_now_iso
+from station_watch.logsafe import loggable_path
 
 REQUEST_TIMEOUT_S = 10.0
 NONCE_BYTES = 16
@@ -39,10 +43,23 @@ class ReviewHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 (stdlib dispatch name)
         if not self._loopback_ok():
             return
-        if self.path.split("?", 1)[0] in ("/", "/index.html"):
-            self._serve_page()
-        else:
+        route, _, query = self.path.partition("?")
+        if route not in ("/", "/index.html"):
             self._send(404, "text/plain; charset=utf-8", "not found\n")
+            return
+        access = guards.page_access(self.headers, query, self.server.token)
+        if access == "login":  # one-time sign-in: set the cookie, drop the token from the URL
+            cookie = guards.token_cookie(self.server.token)
+            self._send(
+                303, "text/plain; charset=utf-8", "", {"Location": "/", "Set-Cookie": cookie}
+            )
+        elif access == "ok":
+            self._serve_page()
+        elif access == "missing":
+            self._log_rejected(401, "no token")
+            self._send(401, "text/plain; charset=utf-8", "open the URL printed at startup\n")
+        else:
+            self._deny("forbidden token")
 
     def do_POST(self) -> None:  # noqa: N802 (stdlib dispatch name)
         if not self._loopback_ok():
@@ -67,18 +84,8 @@ class ReviewHandler(BaseHTTPRequestHandler):
         page = render_review_sheet(
             self.server.title, self.server.flags, effective(self.server.audit_dir), nonce
         )
-        payload = page.encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(payload)))
-        self.send_header(
-            "Set-Cookie",
-            f"{guards.TOKEN_COOKIE}={self.server.token}; HttpOnly; SameSite=Strict; Path=/",
-        )
-        self.send_header("Content-Security-Policy", guards.csp_header(nonce))
-        self._security_headers()
-        self.end_headers()
-        self.wfile.write(payload)
+        csp = {"Content-Security-Policy": guards.csp_header(nonce)}
+        self._send(200, "text/html; charset=utf-8", page, csp)
 
     def _handle_verdict(self) -> None:
         if not guards.token_ok(guards.token_from_request(self.headers), self.server.token):
@@ -125,11 +132,13 @@ class ReviewHandler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cache-Control", "no-store")
 
-    def _send(self, status: int, content_type: str, body: str) -> None:
+    def _send(self, status: int, content_type: str, body: str, extra=None) -> None:
         payload = body.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
+        for name, value in (extra or {}).items():
+            self.send_header(name, value)
         self._security_headers()
         self.end_headers()
         self.wfile.write(payload)
@@ -153,7 +162,8 @@ class ReviewHandler(BaseHTTPRequestHandler):
 
     def _log_rejected(self, status: int, reason: str) -> None:
         sys.stderr.write(
-            f"station-watch audit review: {status} {self.command} {self.path} ({reason})\n"
+            f"station-watch audit review: {status} {loggable_path(self.command)} "
+            f"{loggable_path(self.path)} ({reason})\n"
         )
 
     def __getattr__(self, name: str):

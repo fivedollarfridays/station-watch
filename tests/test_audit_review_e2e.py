@@ -125,7 +125,8 @@ def _start_review(audit):
         text=True,
     )
     port = int(re.search(r"http://127\.0\.0\.1:(\d+)/", proc.stdout.readline()).group(1))
-    return proc, port
+    token = re.search(r"/\?token=(\S+)", proc.stderr.readline()).group(1)
+    return proc, port, token
 
 
 def _run_then_build(tmp_path):
@@ -152,9 +153,10 @@ def test_run_build_review_mark_then_score_correct_count_matches(tmp_path):
     log_before = hashlib.sha256(logdb.read_bytes()).hexdigest()
 
     # Mark the missing_part flag correct over HTTP, using the page's cookie token.
-    proc, port = _start_review(audit)
+    proc, port, token = _start_review(audit)
     try:
-        _, headers, body = _request(port, path="/")
+        # Sign in through the printed URL, as the operator's browser would.
+        _, headers, body = _request(port, path=f"/?token={token}")
         cookie = headers["Set-Cookie"].split(";", 1)[0]
         status, _, resp = _request(
             port,

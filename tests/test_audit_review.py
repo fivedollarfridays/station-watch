@@ -137,11 +137,14 @@ def test_set_cookie_is_httponly_samesite_strict_and_token_is_43_urlsafe_chars(tm
 def test_get_sets_an_httponly_strict_cookie_without_leaking_the_token_into_the_body(tmp_path):
     audit = _audit_dir(tmp_path)
     with _Served(audit, token="tok-fixed-value") as port:
-        status, headers, body = _request(port, path="/")
-        assert status == 200
+        # The sign-in URL sets the cookie and redirects to a token-free URL.
+        status, headers, _ = _request(port, path="/?token=tok-fixed-value")
+        assert status == 303 and headers["Location"] == "/"
         cookie = headers["Set-Cookie"]
         assert "audit_token=tok-fixed-value" in cookie
         assert "HttpOnly" in cookie and "SameSite=Strict" in cookie and "Path=/" in cookie
+        status, _, body = _request(port, path="/", cookie=cookie.split(";", 1)[0])
+        assert status == 200
         assert b"tok-fixed-value" not in body  # token is never rendered into the page
 
 
@@ -183,7 +186,8 @@ def test_xss_hostile_flag_and_note_are_escaped_with_one_nonced_script(tmp_path):
         + "\n"
     )
     with _Served(audit, token="tok-xss-secret") as port:
-        status, headers, raw = _request(port, path="/")
+        status, headers, raw = _request(port, path="/", token="tok-xss-secret")
+    assert status == 200
     body = raw.decode()
 
     page = _Page()
@@ -205,7 +209,8 @@ def test_xss_hostile_flag_and_note_are_escaped_with_one_nonced_script(tmp_path):
 def test_every_html_response_carries_nosniff_and_no_store(tmp_path):
     audit = _audit_dir(tmp_path)
     with _Served(audit) as port:
-        _, headers, _ = _request(port, path="/")
+        status, headers, _ = _request(port, path="/", token="tok-fixed-value")
+        assert status == 200
         assert headers["X-Content-Type-Options"] == "nosniff"
         assert headers["Cache-Control"] == "no-store"
 
@@ -290,7 +295,8 @@ def _start_subprocess_server(audit):
     )
     serving = proc.stdout.readline()
     port = int(re.search(r"http://127\.0\.0\.1:(\d+)/", serving).group(1))
-    token = proc.stderr.readline().split("token ", 1)[1].strip()
+    # The sign-in URL is printed once, on stderr: the operator's only way in.
+    token = re.search(r"/\?token=(\S+)", proc.stderr.readline()).group(1)
     return proc, port, token
 
 
@@ -301,10 +307,13 @@ def test_proving_subprocess_accepts_token_by_cookie_and_header_refuses_otherwise
     fid2 = f"{RUN}:missing_part:rail_pos_2:2"
     proc, port, token = _start_subprocess_server(audit)
     try:
-        # The cookie the page would carry, taken from GET /.
-        _, headers, body = _request(port, path="/")
-        assert token not in body.decode()
+        assert _request(port, path="/")[0] == 401  # no token: the page is not served
+        # The cookie the browser gets from the printed sign-in URL.
+        status, headers, _ = _request(port, path=f"/?token={token}")
+        assert status == 303
         cookie = headers["Set-Cookie"].split(";", 1)[0]  # audit_token=<token>
+        status, _, body = _request(port, path="/", cookie=cookie)
+        assert status == 200 and token not in body.decode()
 
         by_cookie = _post(
             port, cookie=cookie, body=json.dumps({"flag_id": FID, "verdict": "correct"})

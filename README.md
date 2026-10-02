@@ -127,7 +127,7 @@ Check one session's quality with QA. It reads the Log read-only, time-weights ho
 station-watch qa --config config/station-example.yaml --log station.db
 ```
 
-Audit every flag a session raised. `build` writes `flags.json` and a self-contained proof sheet (`index.html`) under `data/local/audit/<log name>/`, showing the exact frames each flag cites ("no flags in this session" when there are none). `review` serves that sheet on loopback with a correct/incorrect control per flag, and `mark` records one verdict without a browser. The Log is never written:
+Audit every flag a session raised. `build` writes `flags.json` and a self-contained proof sheet (`index.html`) under `data/local/audit/<log name>/`, showing the exact frames each flag cites ("no flags in this session" when there are none). `review` serves that sheet on loopback with a correct/incorrect control per flag; it prints a sign-in URL carrying the session token on stderr, and without that token the page is refused. `mark` records one verdict without a browser. The Log is never written:
 
 ```bash
 station-watch audit build --config config/station-example.yaml --log station.db

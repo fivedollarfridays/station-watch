@@ -1,4 +1,4 @@
-"""The checks that gate a ``POST /verdict``: Host, Origin, token, Content-Type, CSP.
+"""The checks that gate the review server: Host, Origin, token, Content-Type, CSP.
 
 Kept as free functions beside the handler so each is unit-testable without a socket
 and so the server module stays within its function-count budget. A loopback-only
@@ -12,6 +12,7 @@ from __future__ import annotations
 import hmac
 import http.cookies
 import json
+import urllib.parse
 
 LOOPBACK = "127.0.0.1"
 TOKEN_COOKIE = "audit_token"
@@ -63,6 +64,26 @@ def token_ok(presented: str | None, expected: str) -> bool:
     return hmac.compare_digest(presented, expected)
 
 
+def page_access(headers, query: str, expected: str) -> str:
+    """Who may see the page: ``login`` (a valid ``?token=``), ``ok``, ``missing`` or ``wrong``.
+
+    A ``?token=`` in the URL is the one-time sign-in from the URL printed at startup;
+    otherwise the cookie or ``X-Audit-Token`` header must match (constant time).
+    """
+    from_query = urllib.parse.parse_qs(query).get("token")
+    if from_query:
+        return "login" if token_ok(from_query[0], expected) else "wrong"
+    presented = token_from_request(headers)
+    if presented is None:
+        return "missing"
+    return "ok" if token_ok(presented, expected) else "wrong"
+
+
+def token_cookie(token: str) -> str:
+    """The ``Set-Cookie`` value that carries the session token (HttpOnly, SameSite=Strict)."""
+    return f"{TOKEN_COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/"
+
+
 def json_content_type(content_type: str | None) -> bool:
     """True only when the media type is ``application/json`` (a charset param is allowed)."""
     media = (content_type or "").split(";", 1)[0].strip().lower()
@@ -89,12 +110,14 @@ def parse_json_body(raw: bytes) -> dict | None:
     """Decode a request body into a JSON object, or ``None`` if it is not one."""
     try:
         data = json.loads(raw.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, RecursionError):  # deep nesting is bad input
         return None
     return data if isinstance(data, dict) else None
 
 
 __all__ = [
+    "page_access",
+    "token_cookie",
     "content_length",
     "LOOPBACK",
     "TOKEN_COOKIE",
