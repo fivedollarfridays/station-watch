@@ -197,7 +197,7 @@ Synthetic proving set (`measurements/synthetic/`, dataset_kind `synthetic`), rea
 | Stalled | <!-- claim: measurements/synthetic/detect.json#metrics.stalled.precision round=2 -->1.00 | <!-- claim: measurements/synthetic/detect.json#metrics.stalled.recall round=2 -->1.00 |
 | Keep-out entry | <!-- claim: measurements/synthetic/detect.json#metrics.keepout_entry.precision round=2 -->1.00 | <!-- claim: measurements/synthetic/detect.json#metrics.keepout_entry.recall round=2 -->1.00 |
 
-Detection latency over <!-- claim: measurements/synthetic/detect.json#metrics.latency.count -->35 synthetic verdicts has a median of <!-- claim: measurements/synthetic/detect.json#metrics.latency.median_s round=2 -->0.44 s and a p95 of <!-- claim: measurements/synthetic/detect.json#metrics.latency.p95_s round=2 -->0.81 s. The synthetic set is <!-- claim: measurements/synthetic/detect.json#provenance.clips -->7 clips across two sessions.
+Detection latency over <!-- claim: measurements/synthetic/detect.json#metrics.latency.count -->35 synthetic verdicts has a median of <!-- claim: measurements/synthetic/detect.json#metrics.latency.median_s round=2 -->0.44 s and a p95 of <!-- claim: measurements/synthetic/detect.json#metrics.latency.p95_s round=2 -->0.82 s. The synthetic set is <!-- claim: measurements/synthetic/detect.json#provenance.clips -->7 clips across two sessions.
 
 ## Inspiration
 

@@ -3,11 +3,11 @@ sessions:
 - clips:
   - path: s1/normal/clip.mkv
     positions:
-    - end_frame: 47
+    - end_frame: 94
       start_frame: 0
       state: present
       target: rail_pos_1
-    - end_frame: 47
+    - end_frame: 94
       start_frame: 0
       state: present
       target: rail_pos_2

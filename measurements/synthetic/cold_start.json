@@ -1,8 +1,8 @@
 {
   "metrics": {
-    "launch_to_first_frame_s": 0.137897,
-    "launch_to_first_healthy_s": 1.148183,
-    "launch_to_first_verdict_s": 1.148183
+    "launch_to_first_frame_s": 0.135217,
+    "launch_to_first_healthy_s": 1.145513,
+    "launch_to_first_verdict_s": 1.145513
   },
   "provenance": {
     "clips": 1,
@@ -11,7 +11,7 @@
     "dataset_kind": "synthetic",
     "date_utc": "2026-10-02",
     "detector": "station_watch.detect:real-pipeline:v1",
-    "git_commit": "81b89ee1b0c9468e39b29c12a344bdd8cf78b794",
+    "git_commit": "657aaa45cc3d12b8feaf89d57b280c2da80e22bd",
     "manifest_sha256": "none",
     "sessions": [],
     "source": "clip.mkv"

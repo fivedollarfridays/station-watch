@@ -38,8 +38,8 @@
     },
     "latency": {
       "count": 35,
-      "median_s": 0.442679,
-      "p95_s": 0.812946
+      "median_s": 0.435822,
+      "p95_s": 0.824638
     },
     "missing_part": {
       "fn": 0,
@@ -89,8 +89,8 @@
         },
         "latency": {
           "count": 14,
-          "median_s": 0.428421,
-          "p95_s": 0.762767
+          "median_s": 0.435075,
+          "p95_s": 0.780329
         },
         "missing_part": {
           "fn": 0,
@@ -129,7 +129,7 @@
           {
             "clip": "s1/blind/clip.mkv",
             "reason": "fiducial_missing",
-            "seconds": 0.223455,
+            "seconds": 0.219259,
             "start_frame": 16
           }
         ]
@@ -173,8 +173,8 @@
         },
         "latency": {
           "count": 21,
-          "median_s": 0.442679,
-          "p95_s": 0.84185
+          "median_s": 0.435822,
+          "p95_s": 0.840602
         },
         "missing_part": {
           "fn": 0,
@@ -241,20 +241,20 @@
       {
         "clip": "s1/blind/clip.mkv",
         "reason": "fiducial_missing",
-        "seconds": 0.223455,
+        "seconds": 0.219259,
         "start_frame": 16
       }
     ]
   },
   "provenance": {
     "clip_sha256s": [
-      "1d09afe5afcd15512f69e49eae3e63a2174b9fd53acad45064283badbf96de11",
-      "56a1f00336d18bf5ac0564591c8d12a049bc4b37cf61080f1aa322ad70030727",
-      "7441acb62dce96ed33185cc299ff94fc477817d5e7ef3b1a90f3cba1f13c201a",
-      "9f7a18a0e6ef400b3391cc2b8e2bdb05c7b2856d11c08a93b06ec11f2184e35c",
-      "b920f6f6490dd3c97b893a897764491605d2a658ec0096d3e728b87a06886530",
-      "d1f4115af7118e187c0567544c3ad61d5767c8a4ca8d903ccdf2dd02ac71d631",
-      "e1f648ebeae65c7fa8a8ae35d79e9a77a63ef3bb6982a42306f576d9561a0bf9"
+      "30b29002eb62dbf5136acea337be4710348576023fbabefc3d5369bfdc70c661",
+      "465541d8dd3af34f5015c6b523b1d8075b455d82b7d064a6be6f5fecfb77a7e7",
+      "9853f5a5ce57faa46bc390aca798029e885e6bd772fe3b62c49fd8565fa0c5ab",
+      "a9de2fc0df170d01f7bb783948b1cfb2fe107c08f3ab5c85e2fa44c3e2a0d310",
+      "c0eb8c59529bae2425dfe92f62c04e486d199ebde72bdf83dfdea137231a3f2f",
+      "c4649862993c0fb2fba5f78246c49734b6a9f3af4d624d4c2255357f06b4bcfc",
+      "d26f163b2540da0a5895f4d88ff1447b0ae12b402f8d865c9d52cee45c499554"
     ],
     "clips": 7,
     "config_sha256": "823f06810a126523b9fac14c53eac3c93dfbc175d6c8c9bdf05a606aeb2ff87c",
@@ -262,8 +262,8 @@
     "dataset_kind": "synthetic",
     "date_utc": "2026-10-02",
     "detector": "station_watch.detect:real-pipeline:v1",
-    "git_commit": "81b89ee1b0c9468e39b29c12a344bdd8cf78b794",
-    "manifest_sha256": "3ca83899d5ef694e54958fd89b43808336fe4229c1436afe5e1641b6964f2b79",
+    "git_commit": "657aaa45cc3d12b8feaf89d57b280c2da80e22bd",
+    "manifest_sha256": "6bb2458ed555d048a54a4b4e29b6863e7466b2f9bb13a377e90aa1151a0a06ae",
     "recorded_on": {
       "s1": null,
       "s2": null
