@@ -32,6 +32,7 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -40,6 +41,7 @@ from station_watch.capture.metrics import fingerprint, mean_luma, noise_score
 from station_watch.capture.resilience import (
     DetectStep,
     liveness_loop,
+    read_frame,
     record_frame_failure,
     reopen_source,
 )
@@ -47,8 +49,10 @@ from station_watch.capture.source import FrameSource
 from station_watch.clock import utc_now_iso
 from station_watch.detect.detector import Detector
 from station_watch.detect.geometry import find_marker_corners, marker_center
-from station_watch.evidence import EvidenceStore
 from station_watch.records import BlindState, FrameRecord
+
+if TYPE_CHECKING:  # annotation only: importing it at runtime forms a cycle via evidence
+    from station_watch.evidence import EvidenceStore
 
 _MONO_EPSILON = 1e-9
 _BACKOFF_START_S = 0.05
@@ -206,7 +210,7 @@ class Capture:
         frame_id = 0
         backoff = _BACKOFF_START_S
         while not self._stopped:
-            frame, error = self._read()
+            frame, error = read_frame(self._source)
             if frame is None:
                 if self._stopped:
                     return
@@ -259,13 +263,6 @@ class Capture:
         """Record a per-frame processing error as ``disconnected``; report it once."""
         self._prev = None
         record_frame_failure(watch, exc, frame_id)
-
-    def _read(self) -> tuple[np.ndarray | None, Exception | None]:
-        """One read; K10: a read that raises is unobservable, never a crash."""
-        try:
-            return self._source.read(), None
-        except Exception as exc:  # any driver failure is "no frame"
-            return None, exc
 
     def _read_failed(self, watch: BlindWatch, error: Exception | None, backoff: float) -> float:
         """Record the failure, wait out the backoff, reopen a live device; next backoff."""

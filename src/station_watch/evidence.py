@@ -120,7 +120,11 @@ class EvidenceStore:
         self._report = report
         self._ring_size = max(1, ring_size)
         self._ring: OrderedDict[int, np.ndarray] = OrderedDict()
-        self._submitted: set[int] = set()
+        # Ids already submitted (dedupe), oldest first. Bounded: a frame still on disk
+        # is among the newest max_files submissions, plus whatever is still queued,
+        # so forgetting older ids can never re-write or falsely miss a kept frame.
+        self._submitted: OrderedDict[int, None] = OrderedDict()
+        self.dedupe_limit = self._max_files + max(1, queue_size)
         self._lock = threading.Lock()
         # A separate lock for the misses file: it is appended from both the capture
         # thread (a dropped frame) and the writer thread (a failed or pruned one),
@@ -177,7 +181,7 @@ class EvidenceStore:
         if frame is None:
             # Aged out of the ring before we could write it: count it as dropped so
             # lookup never silently misses (and never returns a neighbour).
-            self._submitted.add(frame_id)
+            self._remember(frame_id)
             self.dropped += 1
             self._record_miss(frame_id, DROPPED)
             return
@@ -193,7 +197,18 @@ class EvidenceStore:
             self.dropped += 1
             self._record_miss(frame_id, DROPPED)
             return
-        self._submitted.add(frame_id)
+        self._remember(frame_id)
+
+    def _remember(self, frame_id: int) -> None:
+        """Mark ``frame_id`` submitted, forgetting the oldest beyond ``dedupe_limit``."""
+        self._submitted[frame_id] = None
+        while len(self._submitted) > self.dedupe_limit:
+            self._submitted.popitem(last=False)
+
+    @property
+    def dedupe_size(self) -> int:
+        """How many submitted ids the store currently remembers (at most ``dedupe_limit``)."""
+        return len(self._submitted)
 
     # --- Writer thread ----------------------------------------------------------
 

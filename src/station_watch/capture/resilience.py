@@ -47,6 +47,14 @@ def reopen_source(source) -> None:
         pass
 
 
+def read_frame(source):
+    """One read as ``(frame, error)``; K10: a read that raises is unobservable, never a crash."""
+    try:
+        return source.read(), None
+    except Exception as exc:  # any driver failure is "no frame"
+        return None, exc
+
+
 def record_frame_failure(watch, exc: BaseException, frame_id: int) -> None:
     """Record a per-frame processing error as ``disconnected``; report it once.
 
@@ -114,6 +122,7 @@ __all__ = [
     "DetectStep",
     "error_detail",
     "liveness_loop",
+    "read_frame",
     "record_frame_failure",
     "reopen_source",
     "report",

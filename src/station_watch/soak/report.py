@@ -40,10 +40,8 @@ def reproduce_command(args) -> str:
 
 def _metric_rows(metrics: dict) -> list[tuple[str, str]]:
     rows: list[tuple[str, str]] = []
-    for key, value in sorted(metrics.items()):
-        if key.startswith("rss_growth_mb_per_h."):
-            name = key.split(".", 1)[1]
-            rows.append((f"RSS growth {name} (MB/h)", f"{value:.2f}"))
+    for name, value in sorted((metrics.get("rss_growth_mb_per_h") or {}).items()):
+        rows.append((f"RSS growth {name} (MB/h)", f"{value:.2f}"))
     rows.append(("Log growth (MB/h)", f"{metrics.get('log_growth_mb_per_h', 0.0):.2f}"))
     rows.append(("Board render p95 (s)", f"{metrics.get('board_render_p95_s', 0.0):.3f}"))
     rows.append(("Board render failures", str(metrics.get("board_render_failures", 0))))

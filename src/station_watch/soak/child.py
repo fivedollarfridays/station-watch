@@ -22,6 +22,7 @@ import sys
 from station_watch.run import new_run_id
 from station_watch.runner.pipeline import Runner
 from station_watch.runner.startup import StartupError, build_context
+from station_watch.soak.commandline import soak_evidence_dir
 from station_watch.synth.source import SyntheticSource
 
 # Frames per second the looping source paces to: brisk enough that a frame always
@@ -63,7 +64,7 @@ def run_child(args) -> int:
     except StartupError as exc:
         print(f"station-watch: {exc}", file=sys.stderr)
         return 1
-    runner = Runner(context, run_id=new_run_id())
+    runner = Runner(context, run_id=new_run_id(), evidence_dir=soak_evidence_dir(args.log))
     # The supervisor stops its children with SIGTERM; finish the current cycle and
     # shut down cleanly, exactly as `station-watch run` does under a service manager.
     previous = signal.signal(signal.SIGTERM, lambda _sig, _frame: runner.stop())

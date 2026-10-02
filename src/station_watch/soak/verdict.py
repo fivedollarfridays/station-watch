@@ -116,9 +116,11 @@ def _process_names(samples: list) -> list[str]:
 
 def _check_rss(samples, thresholds, metrics, failures) -> None:
     limit = thresholds["max_rss_growth_mb_per_h"]
+    # Nested per process, so ``metrics.rss_growth_mb_per_h.run`` is a dotted claim path.
+    per_process = metrics.setdefault("rss_growth_mb_per_h", {})
     for name in _process_names(samples):
         growth = _rss_growth(samples, name)
-        metrics[f"rss_growth_mb_per_h.{name}"] = growth
+        per_process[name] = growth
         if growth > limit:
             failures.append(f"RSS growth for {name} {growth:.1f} MB/h exceeds max {limit:.1f} MB/h")
 

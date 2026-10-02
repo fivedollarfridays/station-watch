@@ -167,7 +167,7 @@ def test_e2e_synthetic_loop_starts_three_children_samples_stops_and_passes(tmp_p
     assert metrics["status"] == "pass", metrics["failures"]
     assert metrics["post_warmup_samples"] >= 3
     for name in ("run", "watchdog", "board"):  # three children, each sampled for RSS
-        assert f"rss_growth_mb_per_h.{name}" in metrics
+        assert name in metrics["rss_growth_mb_per_h"]
     assert "log_growth_mb_per_h" in metrics
     assert "board_render_p95_s" in metrics
     assert "max_verdict_gap_s" in metrics

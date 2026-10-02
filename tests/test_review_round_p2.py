@@ -1,7 +1,7 @@
-"""Review-round P2s on PR #8: soak scope, soak evidence symmetry, default evidence dir.
+"""Review-round P2s on PR #8: soak scope, soak evidence, default evidence dir.
 
-* A ``--source`` soak runs its ``run`` child with ``--no-evidence``, like the
-  ``--synthetic-loop`` child, so both modes measure the same pipeline.
+* Both soak modes run the pipeline with evidence on (beside the soak Log), as a
+  demo run has it, so the soak's memory samples include the evidence store.
 * The soak table says what a ``pass`` covers (resources, cadence, false flags) and
   that detection accuracy is ``evaluate``'s job, so a pass is not over-read.
 * A real ``run`` with no ``$STATION_WATCH_EVIDENCE_DIR`` writes evidence under
@@ -17,19 +17,49 @@ import sys
 from pathlib import Path
 
 from station_watch.cli import build_parser
-from station_watch.soak.commandline import _runner_argv
+from station_watch.soak.commandline import _runner_argv, soak_evidence_dir
 from station_watch.soak.report import render_table
 from station_watch.synth.video import write_synth_clip
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_source_soak_run_child_keeps_no_evidence():
+def test_source_soak_run_child_keeps_evidence_beside_the_log():
+    # Evidence on, as a demo run has it, so the soak's RSS samples include the store.
     args = build_parser().parse_args(
         ["soak", "--config", "c.yaml", "--log", "l.db", "--source", "clip.mkv", "--minutes", "1"]
     )
     argv = _runner_argv(args)
-    assert argv[3] == "run" and "--no-evidence" in argv
+    assert argv[3] == "run" and "--no-evidence" not in argv
+    assert argv[argv.index("--evidence-dir") + 1] == soak_evidence_dir("l.db") == "l.db.evidence"
+
+
+def test_synthetic_loop_child_runs_with_evidence_too(monkeypatch):
+    import station_watch.soak.child as child
+
+    seen = {}
+
+    class _Runner:
+        def __init__(self, context, **kwargs):
+            seen.update(kwargs)
+
+        def run(self):
+            pass
+
+        def stop(self):
+            pass
+
+    class _Context:
+        class log:  # noqa: N801 -- stands in for the Log handle
+            @staticmethod
+            def close():
+                pass
+
+    monkeypatch.setattr(child, "Runner", _Runner)
+    monkeypatch.setattr(child, "build_context", lambda **_: _Context())
+    args = build_parser().parse_args(["soak", "--child", "--config", "c.yaml", "--log", "l.db"])
+    assert child.run_child(args) == 0
+    assert seen["evidence_dir"] == "l.db.evidence"
 
 
 def test_soak_table_states_what_a_pass_covers():

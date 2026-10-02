@@ -91,7 +91,7 @@ def test_rss_rising_50_fails_10_naming_process_and_numbers():
     assert result["status"] == "fail"
     message = "; ".join(result["failures"])
     assert "run" in message and "50.0" in message and "10.0" in message
-    assert abs(result["metrics"]["rss_growth_mb_per_h.run"] - 50.0) < 0.5
+    assert abs(result["metrics"]["rss_growth_mb_per_h"]["run"] - 50.0) < 0.5
 
 
 def test_flat_rss_series_passes():
@@ -332,7 +332,7 @@ def test_e2e_real_soak_starts_children_samples_stops_and_passes(tmp_path):
     assert metrics["status"] == "pass", metrics["failures"]
     assert metrics["post_warmup_samples"] >= 3
     for name in ("run", "watchdog", "board"):
-        assert f"rss_growth_mb_per_h.{name}" in metrics
+        assert name in metrics["rss_growth_mb_per_h"]
     assert "log_growth_mb_per_h" in metrics
     assert "board_render_p95_s" in metrics
     assert "max_verdict_gap_s" in metrics
