@@ -185,9 +185,10 @@ def clip_specs() -> list[dict]:
     stall_script = _cycles(3, 6, 6) + [_f(_BOTH, motion=True)] * 6 + [_f(_BOTH)] * 60
     keepout = {"keepouts": [{"zone": "zone_press", "start_frame": 14, "end_frame": 31}]}
     return [
-        # Normal work: closed motion/still steps (the step-time baseline measures
-        # them; continuous motion would close none), ending in motion. 48 frames.
-        _clip("s1", "normal", _cycles(3, 8, 6) + _moving(_BOTH, 6), 47),
+        # Normal work: ten closed motion/still steps (the step-time baseline's p95
+        # comes from these; continuous motion would close none), ending in motion.
+        # 95 frames.
+        _clip("s1", "normal", _cycles(10, 5, 4) + _moving(_BOTH, 5), 94),
         missing,
         _blind_clip(),
         _detail_clip("s1", "detail_missing_stripe", "torque_stripe"),
