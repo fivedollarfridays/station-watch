@@ -40,10 +40,17 @@ def _store(tmp_path, **over) -> EvidenceStore:
     return EvidenceStore(tmp_path / "evidence", RUN, **over)
 
 
+def _note(store, frame, frame_id, *, ts="t", observation):
+    """Offer one frame to the store (fingerprint computed from the pixels)."""
+    store.note_frame(
+        frame, frame_id, ts, compute_fingerprint(frame), None, had_observation=observation
+    )
+
+
 def test_observation_frame_is_written_and_resolves_with_matching_fingerprint(tmp_path):
     frame = _frame(1)
     store = _store(tmp_path)
-    store.note_frame(frame, 7, "2026-01-01T00:00:00.000000+00:00", compute_fingerprint(frame), None, had_observation=True)
+    _note(store, frame, 7, ts="2026-01-01T00:00:00.000000+00:00", observation=True)
     store.close()
 
     index = EvidenceIndex.load(tmp_path / "evidence", RUN)
@@ -99,7 +106,7 @@ def test_last_good_before_blind_is_written_from_the_ring(tmp_path):
     frames = {}
     for fid in range(5):
         frames[fid] = _frame(100 + fid)
-        store.note_frame(frames[fid], fid, "t", compute_fingerprint(frames[fid]), None, had_observation=False)
+        _note(store, frames[fid], fid, observation=False)
     # No observations were emitted, but a blind opens citing frame 2 as last good.
     store.note_blind_open(2)
     store.close()
@@ -116,7 +123,8 @@ def test_note_blind_open_none_writes_nothing(tmp_path):
     store.note_frame(frame, 0, "t", compute_fingerprint(frame), None, had_observation=False)
     store.note_blind_open(None)
     store.close()
-    assert EvidenceIndex.load(tmp_path / "evidence", RUN).lookup(0) == MissingEvidence(0, "not_captured")
+    index = EvidenceIndex.load(tmp_path / "evidence", RUN)
+    assert index.lookup(0) == MissingEvidence(0, "not_captured")
 
 
 def test_repeat_citations_dedupe_to_one_file(tmp_path):
@@ -187,7 +195,7 @@ def test_retention_prunes_oldest_first_and_lookup_says_pruned(tmp_path):
     frames = {}
     for fid in range(5):
         frames[fid] = _frame(200 + fid)
-        store.note_frame(frames[fid], fid, "t", compute_fingerprint(frames[fid]), None, had_observation=True)
+        _note(store, frames[fid], fid, observation=True)
     store.close()
 
     index = EvidenceIndex.load(tmp_path / "evidence", RUN)

@@ -15,7 +15,6 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-import numpy as np
 import yaml
 
 from station_watch.alarm.sink import build_sinks
@@ -24,9 +23,9 @@ from station_watch.capture.capture import Capture
 from station_watch.capture.source import FrameSource
 from station_watch.cli import build_parser
 from station_watch.config import load_station_config
-from station_watch.evidence import EvidenceFrame, EvidenceIndex, EvidenceStore, MissingEvidence
+from station_watch.evidence import EvidenceFrame, EvidenceIndex, EvidenceStore
 from station_watch.log import Log
-from station_watch.records import BlindReason, BlindState, VerdictState
+from station_watch.records import BlindReason, BlindState
 from station_watch.run import new_run_id
 from station_watch.runner.pipeline import Runner
 from station_watch.runner.startup import RunContext, resolve_stall_window_or_fail
@@ -158,6 +157,24 @@ def test_every_cited_frame_resolves_to_a_file_with_the_logs_fingerprint(tmp_path
 # --- AC2: a dark blind episode's last good frame resolves to an evidence frame --
 
 
+class _ReplayClock:
+    """A monotonic clock that only advances when Capture's pacer sleeps.
+
+    Lets a dark window of real mono-time elapse deterministically on any machine,
+    so the dark blind opens on frame id, not on wall-clock jitter (see
+    tests/test_capture_blind.py).
+    """
+
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += max(seconds, 0.0)
+
+
 def test_dark_blind_last_good_frame_resolves_to_evidence(tmp_path):
     # Drive Capture directly (no detector): the only evidence it can write is the
     # last good frame before the dark blind opens, through the blind-open tee.
@@ -166,6 +183,7 @@ def test_dark_blind_last_good_frame_resolves_to_evidence(tmp_path):
     evidence_dir = tmp_path / "evidence"
     run_id = "run-dark"
     store = EvidenceStore(evidence_dir, run_id)
+    clock = _ReplayClock()
     thresholds = BlindThresholds(
         liveness_window_s=5.0,
         dark_luma_threshold=15.0,
@@ -186,7 +204,8 @@ def test_dark_blind_last_good_frame_resolves_to_evidence(tmp_path):
             station_id="ST",
             camera_id="CAM",
             run_id=run_id,
-            sleep=lambda _s: None,
+            monotonic=clock.monotonic,
+            sleep=clock.sleep,
             evidence=store,
         )
         capture.run(log, thresholds)
@@ -221,7 +240,8 @@ def _alarm_causes(record_path):
     import json
 
     lines = Path(record_path).read_text().splitlines() if Path(record_path).exists() else []
-    return [json.loads(x)["cause"] for x in lines if x.strip() and json.loads(x)["event"] == "alarm"]
+    events = [json.loads(x) for x in lines if x.strip()]
+    return [e["cause"] for e in events if e["event"] == "alarm"]
 
 
 def _cycle_count(logdb):
@@ -229,7 +249,7 @@ def _cycle_count(logdb):
         return len(log.since(EPOCH, ["cycle"]))
 
 
-def _run_in_process(tmp_path, clip, config_path, *, evidence_dir, store_factory=None, tag=""):
+def _run_in_process(tmp_path, clip, config_path, *, evidence_dir, tag=""):
     config = load_station_config(config_path)
     logdb = tmp_path / f"log{tag}.db"
     record = tmp_path / f"alarm{tag}.jsonl"
@@ -243,8 +263,6 @@ def _run_in_process(tmp_path, clip, config_path, *, evidence_dir, store_factory=
         stall_window_source="test",
     )
     runner = Runner(context, run_id=new_run_id(), speed=1000.0, evidence_dir=evidence_dir)
-    if store_factory is not None:
-        runner._built_store = None  # populated by the patched factory below
     try:
         runner.run()
     finally:
@@ -253,14 +271,17 @@ def _run_in_process(tmp_path, clip, config_path, *, evidence_dir, store_factory=
     return logdb, record
 
 
-def test_a_broken_evidence_writer_leaves_the_run_identical_and_reports_once(tmp_path, monkeypatch):
-    config = _write_config(tmp_path / "station.yaml")
+def test_a_broken_evidence_writer_leaves_the_run_identical_and_reports_once(
+    tmp_path, monkeypatch
+):
+    cfg = tmp_path / "station.yaml"
+    _write_config(cfg)
     clip, _t = write_synth_station_clip(
         tmp_path / "clip", _rail_script(40, pos1="absent"), rail_positions=RAIL, fps=20.0
     )
 
     # Baseline: evidence off.
-    off_log, off_rec = _run_in_process(tmp_path, clip, tmp_path / "station.yaml", evidence_dir=None, tag="_off")
+    off_log, off_rec = _run_in_process(tmp_path, clip, cfg, evidence_dir=None, tag="_off")
 
     # A store whose every write raises, injected where the Runner builds it.
     import station_watch.evidence as ev
@@ -270,16 +291,23 @@ def test_a_broken_evidence_writer_leaves_the_run_identical_and_reports_once(tmp_
 
     created: list[EvidenceStore] = []
 
-    def raising_store(evidence_dir, run_id, **kwargs):
+    def raising_store(evidence_dir, run_id, *, thumb_width, max_files):
         reports: list[str] = []
-        store = ev.EvidenceStore(evidence_dir, run_id, encode=_boom, report=reports.append, **{k: v for k, v in kwargs.items() if k not in ("thumb_width", "max_files")}, thumb_width=kwargs.get("thumb_width", ev.DEFAULT_THUMB_WIDTH), max_files=kwargs.get("max_files", ev.DEFAULT_MAX_FILES))
+        store = ev.EvidenceStore(
+            evidence_dir,
+            run_id,
+            thumb_width=thumb_width,
+            max_files=max_files,
+            encode=_boom,
+            report=reports.append,
+        )
         store._test_reports = reports  # type: ignore[attr-defined]
         created.append(store)
         return store
 
     monkeypatch.setattr("station_watch.runner.pipeline.EvidenceStore", raising_store)
     on_log, on_rec = _run_in_process(
-        tmp_path, clip, tmp_path / "station.yaml", evidence_dir=str(tmp_path / "evidence"), tag="_on"
+        tmp_path, clip, cfg, evidence_dir=str(tmp_path / "evidence"), tag="_on"
     )
 
     assert _verdict_content(on_log) == _verdict_content(off_log), "verdicts must be unchanged"
@@ -323,12 +351,14 @@ def test_no_evidence_writes_nothing_under_the_evidence_dir(tmp_path):
 # --- AC7: default dir is under data/local; nothing tracked under evidence/audit --
 
 
-def test_default_evidence_dir_is_under_data_local():
+def test_default_evidence_dir_is_under_data_local(monkeypatch):
+    # The real default, with the test-suite's isolation override cleared.
+    from station_watch.cli import DEFAULT_EVIDENCE_DIR
+
+    monkeypatch.delenv("STATION_WATCH_EVIDENCE_DIR", raising=False)
     parser = build_parser()
-    args = parser.parse_args(
-        ["run", "--config", "c.yaml", "--source", "0", "--log", "l.db"]
-    )
-    assert args.evidence_dir == "data/local/evidence"
+    args = parser.parse_args(["run", "--config", "c.yaml", "--source", "0", "--log", "l.db"])
+    assert args.evidence_dir == DEFAULT_EVIDENCE_DIR == "data/local/evidence"
     assert args.evidence_dir.startswith("data/local/")
 
 

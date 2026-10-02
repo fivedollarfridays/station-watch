@@ -9,6 +9,7 @@ station never limps along half-wired; the CLI turns that into a non-zero exit.
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,15 +21,26 @@ from station_watch.capture.blind import BlindThresholds
 from station_watch.capture.source import CaptureError, FrameSource
 from station_watch.config import StationConfig, load_station_config
 from station_watch.detect.detector import detect_targets_configured
-from station_watch.evidence import EvidenceSettings
 from station_watch.detect.yolox import (
     WeightsError,
     YoloxBackend,
     default_model_path,
     verify_weights,
 )
+from station_watch.evidence import EvidenceSettings
 from station_watch.log import Log, LogError
 from station_watch.steps import StepTimesError, resolve_stall_window
+
+# The run's evidence frames land here by default -- under the gitignored local
+# data dir, never committed. ``STATION_WATCH_EVIDENCE_DIR`` overrides it (ops may
+# point evidence at a dedicated volume; the test suite points it at a temp dir so
+# a real run under pytest never writes into the source tree).
+DEFAULT_EVIDENCE_DIR = "data/local/evidence"
+
+
+def default_evidence_dir() -> str:
+    """The default evidence dir: ``$STATION_WATCH_EVIDENCE_DIR`` or ``data/local/evidence``."""
+    return os.environ.get("STATION_WATCH_EVIDENCE_DIR", DEFAULT_EVIDENCE_DIR)
 
 
 class StartupError(RuntimeError):
