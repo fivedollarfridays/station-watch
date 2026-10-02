@@ -32,6 +32,13 @@ recover_good_frames: 5          # consecutive good frames needed to clear blind
 cycle_interval_s: 1.0           # one cycle every second, frame or not
 recover_healthy_verdicts: 3     # consecutive healthy verdicts to leave fault
 
+# Optional, read only by `station-watch preflight`: the camera sits on a gimbal (for
+# example a DJI Pocket used as a USB webcam). Its camera_stability check then always
+# WARNs to lock the gimbal before going live; see docs/CAMERAS.md. This `camera:`
+# mapping is separate from `camera_id` above.
+# camera:
+#   gimbal: true
+
 # Fiducial marker (the camera canary) used to detect a missing or shifted view.
 # These values match the synthetic test clip: a 40 px DICT_4X4_50 marker whose
 # center sits at (40, 40). For a real camera, put the printed marker in view and

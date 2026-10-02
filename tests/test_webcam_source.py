@@ -215,3 +215,12 @@ def test_pocket3_device_steps_are_marked_unverified():
     assert steps, "the Pocket 3 section should list device steps"
     for step in steps:
         assert "unverified" in step.lower(), step
+
+
+def test_example_config_documents_the_optional_gimbal_key():
+    # The example config is where operators start, so the optional `camera.gimbal`
+    # stanza is there, commented, and loads as a mapping once uncommented.
+    text = (ROOT / "config" / "station-example.yaml").read_text()
+    assert "# camera:\n#   gimbal: true\n" in text
+    uncommented = text.replace("# camera:\n#   gimbal: true\n", "camera:\n  gimbal: true\n")
+    assert yaml.safe_load(uncommented)["camera"] == {"gimbal": True}
